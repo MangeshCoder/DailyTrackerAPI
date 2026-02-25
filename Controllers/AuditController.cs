@@ -1,0 +1,23 @@
+﻿using DailyTrackerAPI.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+
+namespace DailyTrackerAPI.Controllers
+{
+    // ─── Audit Log Controller (Manager only) ──────────────────────────────────
+    [ApiController, Route("api/audit"), Authorize(Roles = "Manager")]
+    public class AuditController : ControllerBase
+    {
+        private readonly IAuditService _auditSvc;
+        public AuditController(IAuditService auditSvc) => _auditSvc = auditSvc;
+
+        [HttpGet]
+        public async Task<IActionResult> GetLogs(
+            [FromQuery] int? userId, [FromQuery] string? entity, [FromQuery] int take = 50)
+        {
+            var logs = await _auditSvc.GetLogsAsync(userId, entity, take);
+            return Ok(logs);
+        }
+    }
+}
