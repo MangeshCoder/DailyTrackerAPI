@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using DailyTrackerAPI.Models;
+using System.Net;
 using System.Net.Mail;
 
 namespace DailyTrackerAPI.Services
@@ -7,6 +8,8 @@ namespace DailyTrackerAPI.Services
     {
         Task SendOtpEmailAsync(string email, string code, string purpose);
         Task SendWelcomeEmailAsync(string email, string fullName);
+        Task SendLeaveAppliedEmailAsync(string to, string managerName, string employeeName, LeaveRequest leave, string token);
+        Task SendLeaveReviewedEmailAsync(string to, string employeeName, string managerName, LeaveRequest leave, string status, string? note);
     }
     public class EmailService : IEmailService
     {
@@ -157,6 +160,198 @@ namespace DailyTrackerAPI.Services
             </html>";
 
             await SendEmailAsync(email, subject, body);
+        }
+        public async Task SendLeaveAppliedEmailAsync(
+        string to,
+        string managerName,
+        string employeeName,
+        LeaveRequest leave,string token)
+        {
+            var subject = $"New Leave Request from {employeeName}";
+
+            var frontendUrl = _config["FrontendUrl"];
+
+            var approveUrl = $"{frontendUrl}/email-action?token={token}&status=Approved";
+            var rejectUrl = $"{frontendUrl}/email-action?token={token}&status=Rejected";
+
+            var body = $@"
+                <html>
+                <body style='margin:0;padding:0;background:#f4f6f9;font-family:Segoe UI;'>
+
+                <table width='100%' cellpadding='0' cellspacing='0' style='padding:30px 0;'>
+                <tr>
+                <td align='center'>
+
+                <table width='600' cellpadding='0' cellspacing='0'
+                style='background:#ffffff;border-radius:10px;padding:30px;'>
+
+                <tr>
+                <td>
+
+                <h2 style='color:#2563eb;margin-top:0;'>New Leave Request</h2>
+
+                <p>Hi <strong>{managerName}</strong>,</p>
+
+                <p><strong>{employeeName}</strong> has applied for leave.</p>
+
+                <table width='100%' cellpadding='6' cellspacing='0'
+                style='background:#f9fafb;border-radius:6px;margin:15px 0;'>
+
+                <tr><td width='120'><b>Type:</b></td><td>{leave.LeaveType}</td></tr>
+                <tr><td><b>From:</b></td><td>{leave.FromDate:dd MMM yyyy}</td></tr>
+                <tr><td><b>To:</b></td><td>{leave.ToDate:dd MMM yyyy}</td></tr>
+                <tr><td><b>Reason:</b></td><td>{leave.Reason}</td></tr>
+
+                </table>
+
+                <div style='margin-top:25px;text-align:center;'>
+
+                <a href='{approveUrl}'
+                style='background:#16a34a;color:white;padding:10px 18px;
+                text-decoration:none;border-radius:6px;margin-right:10px;
+                display:inline-block;font-weight:600;'>
+                Approve
+                </a>
+
+                <a href='{rejectUrl}'
+                style='background:#dc2626;color:white;padding:10px 18px;
+                text-decoration:none;border-radius:6px;
+                display:inline-block;font-weight:600;'>
+                Reject
+                </a>
+
+                </div>
+
+                <p style='margin-top:20px;color:#777;font-size:13px;'>
+                This link expires in 24 hours.
+                </p>
+
+                </td>
+                </tr>
+
+                </table>
+
+                </td>
+                </tr>
+                </table>
+
+                </body>
+                </html>";
+
+            await SendEmailAsync(to, subject, body);
+        }
+
+        public async Task SendLeaveReviewedEmailAsync(
+            string to,
+            string employeeName,
+            string managerName,
+            LeaveRequest leave,
+            string status,
+            string? note)
+        {
+            var subject = $"Your Leave Request is {status}";
+
+            var color = status == "Approved" ? "#16a34a" : "#dc2626";
+            var bgColor = status == "Approved" ? "#ecfdf5" : "#fef2f2";
+            var badgeColor = status == "Approved" ? "#22c55e" : "#ef4444";
+
+            var body = $@"
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset='UTF-8'>
+            </head>
+            <body style='margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,sans-serif;'>
+
+            <table width='100%' cellpadding='0' cellspacing='0'>
+            <tr>
+            <td align='center'>
+
+            <table width='600' cellpadding='0' cellspacing='0' 
+                   style='background:#ffffff;margin:30px 0;border-radius:12px;overflow:hidden;
+                          box-shadow:0 4px 12px rgba(0,0,0,0.08);'>
+
+            <!-- Header -->
+            <tr>
+            <td style='background:{color};padding:20px;text-align:center;color:white;'>
+                <h2 style='margin:0;'>Leave Request {status}</h2>
+            </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+            <td style='padding:30px;'>
+
+            <p style='font-size:15px;margin:0 0 15px;'>Hi <b>{employeeName}</b>,</p>
+
+            <p style='font-size:14px;margin:0 0 20px;line-height:1.6;color:#374151;'>
+            Your leave request has been 
+            <span style='background:{bgColor};
+                         color:{badgeColor};
+                         padding:6px 12px;
+                         border-radius:20px;
+                         font-weight:bold;
+                         font-size:13px;'>
+                {status}
+            </span>
+            by <b>{managerName}</b>.
+            </p>
+
+            <table width='100%' cellpadding='8' cellspacing='0' 
+                   style='border-collapse:collapse;font-size:14px;'>
+
+            <tr style='background:#f9fafb;'>
+            <td style='border:1px solid #e5e7eb;'><b>Leave Type</b></td>
+            <td style='border:1px solid #e5e7eb;'>{leave.LeaveType}</td>
+            </tr>
+
+            <tr>
+            <td style='border:1px solid #e5e7eb;'><b>From</b></td>
+            <td style='border:1px solid #e5e7eb;'>{leave.FromDate:dd MMM yyyy}</td>
+            </tr>
+
+            <tr style='background:#f9fafb;'>
+            <td style='border:1px solid #e5e7eb;'><b>To</b></td>
+            <td style='border:1px solid #e5e7eb;'>{leave.ToDate:dd MMM yyyy}</td>
+            </tr>
+
+            </table>
+
+            {(string.IsNullOrEmpty(note) ? "" : $@"
+            <div style='margin-top:20px;padding:15px;
+                        background:#f3f4f6;border-radius:8px;'>
+                <p style='margin:0;font-size:13px;'>
+                    <b>Manager Note:</b><br/>
+                    {note}
+                </p>
+            </div>
+            ")}
+
+            <p style='margin-top:30px;font-size:13px;color:#6b7280;'>
+            If you have any questions, please contact your manager.
+            </p>
+
+            </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+            <td style='background:#f9fafb;padding:15px;text-align:center;
+                       font-size:12px;color:#9ca3af;'>
+                © {DateTime.UtcNow.Year} Employee Management System
+            </td>
+            </tr>
+
+            </table>
+
+            </td>
+            </tr>
+            </table>
+
+            </body>
+            </html>";
+
+            await SendEmailAsync(to, subject, body);
         }
 
         private async Task SendEmailAsync(string to, string subject, string body)
