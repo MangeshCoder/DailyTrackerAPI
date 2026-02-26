@@ -728,4 +728,18 @@ namespace DailyTrackerAPI.DTOs
         public string Role { get; set; }
         public string Code { get; set; }
     }
+
+    public class EmailReviewDto
+    {
+        public string Token { get; set; }
+        public string Status { get; set; }
+    }
+
+    public class LeaveBalanceDto
+    {
+        public int UserId { get; set; }
+        public string UserName { get; set; } = "";
+        public int UsedDays { get; set; }
+        public int RemainingDays { get; set; }
+    }
 }

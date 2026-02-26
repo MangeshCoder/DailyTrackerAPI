@@ -1,8 +1,10 @@
+using DailyTrackerAPI.Custom;
 using DailyTrackerAPI.Data;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Hubs;
 using DailyTrackerAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -98,6 +100,7 @@ builder.Services.AddScoped<ITaskTimerService, TaskTimerService>();
 builder.Services.AddScoped<IWFHRequestService, WFHRequestService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
+builder.Services.AddScoped<IEmailActionService, EmailActionService>();
 
 builder.Services.AddHttpClient();
 
@@ -180,7 +183,37 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.ContentType = "application/json";
 
+        var exception = context.Features
+            .Get<IExceptionHandlerFeature>()?
+            .Error;
+
+        if (exception is ValidationException)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+            await context.Response.WriteAsJsonAsync(new
+            {
+                message = exception.Message
+            });
+
+            return;
+        }
+
+        // Generic fallback
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = "An unexpected error occurred."
+        });
+    });
+});
 // ─── Middleware Pipeline ───────────────────────────────────────────────────────
 if (app.Environment.IsDevelopment())
 {
