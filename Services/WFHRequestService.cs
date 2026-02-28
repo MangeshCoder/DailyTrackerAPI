@@ -2,6 +2,7 @@
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 
 namespace DailyTrackerAPI.Services
 {
@@ -34,11 +35,13 @@ namespace DailyTrackerAPI.Services
     {
         private readonly AppDbContext _db;
         private readonly ILogger<WFHRequestService> _logger;
+        private readonly IEmailService _emailService;
 
-        public WFHRequestService(AppDbContext db, ILogger<WFHRequestService> logger)
+        public WFHRequestService(AppDbContext db, ILogger<WFHRequestService> logger, IEmailService emailService)
         {
             _db = db;
             _logger = logger;
+            _emailService = emailService;
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -83,6 +86,40 @@ namespace DailyTrackerAPI.Services
 
             _db.WFHRequests.Add(request);
             await _db.SaveChangesAsync();
+
+            // Get employee
+            var employee = await _db.Users
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (employee == null)
+                throw new Exception("Employee not found.");
+
+            // Ensure employee has manager assigned
+            if (employee.ManagerId == null)
+                throw new Exception("No manager assigned to this employee.");
+
+            // Get manager
+            var manager = await _db.Users
+                .FirstOrDefaultAsync(u => u.Id == employee.ManagerId);
+
+            if (manager == null)
+                throw new Exception("Assigned manager not found.");
+
+            // Optional safety: Ensure manager role is valid
+            if (manager.Role is not ("Manager" or "TeamLead" or "Admin"))
+                throw new Exception("Assigned user is not authorized as a manager.");
+
+            // Generate email token
+            var token = GenerateWFHEmailToken(request.Id, manager.Id);
+
+            // Send email
+            await _emailService.SendWFHAppliedEmailAsync(
+                manager.Email!,
+                manager.FullName,
+                employee.FullName,
+                request,
+                token
+            );
 
             _logger.LogInformation("User {UserId} submitted {Type} request for {Date}",
                 userId, dto.RequestType, requestDate.ToString("yyyy-MM-dd"));
@@ -157,6 +194,14 @@ namespace DailyTrackerAPI.Services
             await ApplyStatusToDailyLog(request);
 
             await _db.SaveChangesAsync();
+            await _emailService.SendWFHReviewedEmailAsync(
+                request.User.Email!,
+                request.User.FullName,
+                request.ReviewedBy?.FullName ?? "Manager",
+                request,
+                "Approved",
+                note
+            );
 
             _logger.LogInformation("Manager {ManagerId} approved {Type} request {RequestId} for user {UserId}",
                 managerId, request.RequestType, requestId, request.UserId);
@@ -195,6 +240,14 @@ namespace DailyTrackerAPI.Services
             }
 
             await _db.SaveChangesAsync();
+            await _emailService.SendWFHReviewedEmailAsync(
+                request.User.Email!,
+                request.User.FullName,
+                request.ReviewedBy?.FullName ?? "Manager",
+                request,
+                "Rejected",
+                note
+            );
             return request;
         }
 
@@ -516,5 +569,13 @@ namespace DailyTrackerAPI.Services
             ReviewedAt = r.ReviewedAt,
             RequestedAt = r.RequestedAt,
         };
+
+        private string GenerateWFHEmailToken(int requestId, int managerId)
+        {
+            var expiry = DateTime.UtcNow.AddHours(24);
+
+            var payload = $"{requestId}|{managerId}|{expiry:O}";
+            return Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
+        }
     }
 }

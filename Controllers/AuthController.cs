@@ -27,6 +27,11 @@ namespace DailyTrackerAPI.Controllers
             _db = db;
         }
 
+        /// <summary>
+        /// Register new user
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
@@ -42,16 +47,10 @@ namespace DailyTrackerAPI.Controllers
             }
         }
 
-        //[HttpPost("login")]
-        //public async Task<IActionResult> Login([FromBody] LoginDto dto)
-        //{
-        //    var result = await _authService.LoginAsync(dto);
-        //    if (result == null)
-        //        return Unauthorized(new { message = "Invalid email or password." });
-
-        //    return Ok(result);
-        //}
-
+        /// <summary>
+        /// Get all users data
+        /// </summary>
+        /// <returns></returns>
         [Authorize]
         [HttpGet("users")]
         public async Task<IActionResult> GetAllUsers()
@@ -60,6 +59,12 @@ namespace DailyTrackerAPI.Controllers
             return Ok(users);
         }
 
+        /// <summary>
+        /// Login user 
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <param name="deviceToken"></param>
+        /// <returns></returns>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto, [FromHeader(Name = "X-Device-Token")] string? deviceToken = null)
         {
@@ -72,7 +77,11 @@ namespace DailyTrackerAPI.Controllers
             catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
         }
 
-        /// <summary>Complete login when 2FA is required. Send the TempToken from login + the 6-digit code.</summary>
+        /// <summary>
+        /// Complete login when 2FA is required. Send the TempToken from login + the 6-digit code.
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("verify-2fa-login")]
         public async Task<IActionResult> Verify2FALogin([FromBody] Verify2FALoginDto dto)
         {
@@ -85,7 +94,10 @@ namespace DailyTrackerAPI.Controllers
             catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
         }
 
-        /// <summary>Get QR code to set up 2FA. Requires Bearer token. Call verify-2fa-setup to enable.</summary>
+        /// <summary>
+        /// Get QR code to set up 2FA. Requires Bearer token. Call verify-2fa-setup to enable.
+        /// </summary>
+        /// <returns></returns>
         [Authorize]
         [HttpPost("setup-2fa")]
         public async Task<IActionResult> Setup2FA()
@@ -102,7 +114,11 @@ namespace DailyTrackerAPI.Controllers
             catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
         }
 
-        /// <summary>Verify the 6-digit code from authenticator app to enable 2FA.</summary>
+        /// <summary>
+        /// Verify the 6-digit code from authenticator app to enable 2FA.
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [Authorize]
         [HttpPost("verify-2fa-setup")]
         public async Task<IActionResult> Verify2FASetup([FromBody] Verify2FASetupDto dto)
@@ -119,7 +135,11 @@ namespace DailyTrackerAPI.Controllers
             catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
         }
 
-        /// <summary>Disable 2FA. Requires current 6-digit code to verify identity.</summary>
+        /// <summary>
+        /// Disable 2FA. Requires current 6-digit code to verify identity
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [Authorize]
         [HttpPost("disable-2fa")]
         public async Task<IActionResult> Disable2FA([FromBody] Disable2FADto dto)
@@ -136,7 +156,10 @@ namespace DailyTrackerAPI.Controllers
             catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
         }
 
-        /// <summary>Check if current user has 2FA enabled.</summary>
+        /// <summary>
+        /// Check if current user has 2FA enabled.
+        /// </summary>
+        /// <returns></returns>
         [Authorize]
         [HttpGet("2fa-status")]
         public async Task<IActionResult> Get2FAStatus()
@@ -147,7 +170,11 @@ namespace DailyTrackerAPI.Controllers
             return Ok(new { twoFactorEnabled = enabled });
         }
 
-        /// <summary>Trust this device to skip 2FA for 30 days. Requires Bearer token. Pass deviceToken in body.</summary>
+        /// <summary>
+        /// Trust this device to skip 2FA for 30 days. Requires Bearer token. Pass deviceToken in body.
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [Authorize]
         [HttpPost("trust-device")]
         public async Task<IActionResult> TrustDevice([FromBody] TrustDeviceRequest dto)
@@ -165,18 +192,38 @@ namespace DailyTrackerAPI.Controllers
             catch (Exception ex) { return BadRequest(new { message = ex.Message }); }
         }
 
+        /// <summary>
+        /// Get refresh token
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("refresh")]
-        public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequestDto dto)
+        public async Task<IActionResult> Refresh()
         {
             try
             {
+                var refreshToken = Request.Cookies["refreshToken"];
+                if (string.IsNullOrEmpty(refreshToken))
+                    return Unauthorized();
+
                 var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-                var result = await _authSvc.RefreshAsync(dto.RefreshToken, ip);
-                return Ok(result);
+                var result = await _authSvc.RefreshAsync(refreshToken, ip);
+
+                SetAuthCookies(result);
+
+                return Ok(new { user = result.User });
             }
-            catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
         }
 
+        /// <summary>
+        /// Revoke token
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("revoke"), Authorize]
         public async Task<IActionResult> Revoke([FromBody] RefreshTokenRequestDto dto)
         {
@@ -184,13 +231,24 @@ namespace DailyTrackerAPI.Controllers
             return Ok(new { message = "Token revoked." });
         }
 
+        /// <summary>
+        /// Logou user 
+        /// </summary>
+        /// <returns></returns>
         [HttpPost("logout"), Authorize]
         public async Task<IActionResult> Logout()
         {
             await _authSvc.RevokeAllForUserAsync(User.GetUserId());
+            Response.Cookies.Delete("accessToken");
+            Response.Cookies.Delete("refreshToken");
             return Ok(new { message = "Logged out from all sessions." });
         }
 
+        /// <summary>
+        /// Send register user email otp 
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("send-register-otp")]
         public async Task<IActionResult> SendRegisterOtp([FromBody] EmailRequestDto dto)
         {
@@ -198,6 +256,11 @@ namespace DailyTrackerAPI.Controllers
             return Ok(new { message = "OTP sent to email." });
         }
 
+        /// <summary>
+        /// Verify register user email otp
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("verify-register-otp")]
         public async Task<IActionResult> VerifyRegisterOtp([FromBody] RegisterWithOtpDto dto)
         {
@@ -205,7 +268,6 @@ namespace DailyTrackerAPI.Controllers
             if (!valid)
                 return BadRequest(new { message = "Invalid or expired OTP." });
 
-            // ✅ Convert to RegisterDto
             var registerDto = new RegisterDto
             {
                 FullName = dto.FullName,
@@ -222,6 +284,11 @@ namespace DailyTrackerAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Verify login user email otp
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("verify-login-otp")]
         public async Task<IActionResult> VerifyLoginOtp([FromBody] VerifyLoginOtpDto dto)
         {
@@ -236,6 +303,12 @@ namespace DailyTrackerAPI.Controllers
                     HttpContext.Connection.RemoteIpAddress?.ToString()
                 );
 
+                if (!result.RequiresTwoFactor)
+                {
+                    SetAuthCookies(result.Tokens);
+                    return Ok(new { user = result.Tokens.User });
+                }
+
                 return Ok(result);
             }
             catch (UnauthorizedAccessException ex)
@@ -244,6 +317,11 @@ namespace DailyTrackerAPI.Controllers
             }
         }
 
+        /// <summary>
+        /// Send email otp for forgot password
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("send-forgot-password-otp")]
         public async Task<IActionResult> SendForgotPasswordOtp([FromBody] EmailRequestDto dto)
         {
@@ -255,6 +333,11 @@ namespace DailyTrackerAPI.Controllers
             return Ok(new { message = "OTP sent to email." });
         }
 
+        /// <summary>
+        /// Send login otp to user mail address
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("send-login-otp")]
         public async Task<IActionResult> SendLoginOtp([FromBody] EmailRequestDto dto)
         {
@@ -267,6 +350,11 @@ namespace DailyTrackerAPI.Controllers
         }
 
 
+        /// <summary>
+        /// Reset password
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
         {
@@ -278,6 +366,28 @@ namespace DailyTrackerAPI.Controllers
             await _db.SaveChangesAsync();
 
             return Ok(new { message = "Password reset successful." });
+        }
+
+        private void SetAuthCookies(AuthResponseV2Dto tokens)
+        {
+            var accessOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = HttpContext.Request.IsHttps, // auto detect
+                SameSite = SameSiteMode.None, // ⭐ required for localhost cross-origin
+                Expires = DateTime.UtcNow.AddMinutes(15)
+            };
+
+            var refreshOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = HttpContext.Request.IsHttps,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddDays(7)
+            };
+
+            Response.Cookies.Append("accessToken", tokens.AccessToken, accessOptions);
+            Response.Cookies.Append("refreshToken", tokens.RefreshToken, refreshOptions);
         }
     }
 }

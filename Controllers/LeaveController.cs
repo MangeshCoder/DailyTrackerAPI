@@ -1,9 +1,11 @@
-﻿using DailyTrackerAPI.DTOs;
+﻿using DailyTrackerAPI.Data;
+using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Controllers
 {
@@ -12,7 +14,12 @@ namespace DailyTrackerAPI.Controllers
     public class LeaveController : ControllerBase
     {
         private readonly ILeaveService _leaveSvc;
-        public LeaveController(ILeaveService leaveSvc) => _leaveSvc = leaveSvc;
+        private readonly AppDbContext _context;
+        public LeaveController(ILeaveService leaveSvc, AppDbContext context)
+        {
+            _leaveSvc = leaveSvc;
+            _context = context;
+        }
 
         [HttpPost]
         public async Task<IActionResult> Apply([FromBody] ApplyLeaveDto dto)
@@ -51,6 +58,61 @@ namespace DailyTrackerAPI.Controllers
         {
             await _leaveSvc.ReviewAsync(id, User.GetUserId(), dto);
             return Ok(new { message = "Leave reviewed." });
+        }
+
+        [AllowAnonymous]
+        [HttpPost("email-review")]
+        public async Task<IActionResult> EmailReview([FromBody] EmailReviewDto dto)
+        {
+            if (string.IsNullOrEmpty(dto.Token) || string.IsNullOrEmpty(dto.Status))
+                return BadRequest("Invalid request");
+
+            var action = await _context.LeaveEmailActions
+                .FirstOrDefaultAsync(x => x.Token == dto.Token);
+
+            if (action == null)
+                return BadRequest("Invalid token");
+
+            if (action.IsUsed)
+                return BadRequest("This link has already been used");
+
+            if (action.ExpiryDate < DateTime.UtcNow)
+                return BadRequest("This link has expired");
+
+            var leave = await _context.LeaveRequests
+                .FirstOrDefaultAsync(x => x.Id == action.LeaveId);
+
+            if (leave == null)
+                return BadRequest("Leave not found");
+
+            if (leave.Status != "Pending")
+                return BadRequest("Leave already processed");
+
+            await _leaveSvc.ReviewAsync(
+                action.LeaveId,
+                action.ManagerId,
+                new ReviewLeaveDto
+                {
+                    Status = dto.Status,
+                    ReviewNote = "Reviewed via email"
+                });
+
+            action.IsUsed = true;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Leave updated successfully" });
+        }
+
+        [HttpGet("balance")]
+        public async Task<IActionResult> GetBalance()
+        {
+            var userId = User.GetUserId();
+            var role = User.FindFirst("role")?.Value;
+
+            if (role == "Manager")
+                return Ok(await _leaveSvc.GetMonthlyBalanceAsync());
+
+            return Ok(await _leaveSvc.GetMonthlyBalanceAsync(userId));
         }
     }
 }

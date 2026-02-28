@@ -20,8 +20,8 @@ namespace DailyTrackerAPI.Services
     public class EODService : IEODService
     {
         private readonly AppDbContext _db;
-
-        public EODService(AppDbContext db) { _db = db; }
+        private readonly IAppNotificationService _notif;
+        public EODService(AppDbContext db, IAppNotificationService notif) { _db = db; _notif = notif; }
 
         public async Task<EODReportResponseDto> SubmitReportAsync(int userId, CreateEODReportDto dto)
         {
@@ -34,6 +34,15 @@ namespace DailyTrackerAPI.Services
 
             if (existing != null)
             {
+                // ❌ BLOCK UPDATE IF ALREADY REVIEWED
+                if (existing.IsReviewedByManager)
+                {
+                    throw new InvalidOperationException(
+                        "Manager already reviewed this EOD report. You cannot modify it."
+                    );
+                }
+
+                // ✅ Allow update only if NOT reviewed
                 existing.WhatWasDone = dto.WhatWasDone;
                 existing.Blockers = dto.Blockers;
                 existing.PlanForTomorrow = dto.PlanForTomorrow;
@@ -103,9 +112,22 @@ namespace DailyTrackerAPI.Services
             var report = await _db.EODReports.FindAsync(reportId)
                 ?? throw new KeyNotFoundException("Report not found.");
 
+            // Get manager details
+            var manager = await _db.Users.FindAsync(managerId);
+
             report.IsReviewedByManager = true;
             report.ManagerComment = dto.ManagerComment;
             await _db.SaveChangesAsync();
+
+            // ✅ SEND NOTIFICATION TO DEVELOPER
+            await _notif.CreateAsync(
+                userId: report.UserId,
+                title: "📝 EOD Report Reviewed",
+                message: $"{manager?.FullName ?? "Manager"} reviewed your EOD report for {report.ReportDate:MMM dd}" +
+                    (string.IsNullOrEmpty(dto.ManagerComment) ? "" : $": \"{dto.ManagerComment}\""),
+                type: "Info",
+                actionUrl: "/eod-reports"  // Navigate to EOD page when clicked
+            );
         }
 
         private static Task<EODReportResponseDto> MapReport(EODReport r) =>

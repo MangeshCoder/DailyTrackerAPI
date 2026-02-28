@@ -18,6 +18,11 @@ namespace DailyTrackerAPI.Controllers
             _logService = logService;
         }
 
+        /// <summary>
+        /// User daily check-in
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("checkin")]
         public async Task<IActionResult> CheckIn([FromBody] CheckInDto dto)
         {
@@ -29,6 +34,11 @@ namespace DailyTrackerAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// User daily check-out
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPut("checkout")]
         public async Task<IActionResult> CheckOut([FromBody] CheckOutDto dto)
         {
@@ -40,6 +50,10 @@ namespace DailyTrackerAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Get user daily check-in check-out record
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("today")]
         public async Task<IActionResult> GetToday()
         {
@@ -48,6 +62,11 @@ namespace DailyTrackerAPI.Controllers
             return result == null ? NotFound() : Ok(result);
         }
 
+        /// <summary>
+        /// Get user check-in check-out record by date 
+        /// </summary>
+        /// <param name="date"></param>
+        /// <returns></returns>
         [HttpGet("date/{date}")]
         public async Task<IActionResult> GetByDate(DateTime date)
         {
@@ -56,6 +75,11 @@ namespace DailyTrackerAPI.Controllers
             return result == null ? NotFound() : Ok(result);
         }
 
+        /// <summary>
+        /// Get user check-in check-out history
+        /// </summary>
+        /// <param name="days"></param>
+        /// <returns></returns>
         [HttpGet("history")]
         public async Task<IActionResult> GetHistory([FromQuery] int days = 30)
         {

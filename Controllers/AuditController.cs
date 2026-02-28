@@ -5,13 +5,19 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace DailyTrackerAPI.Controllers
 {
-    // ─── Audit Log Controller (Manager only) ──────────────────────────────────
     [ApiController, Route("api/audit"), Authorize(Roles = "Manager")]
     public class AuditController : ControllerBase
     {
         private readonly IAuditService _auditSvc;
         public AuditController(IAuditService auditSvc) => _auditSvc = auditSvc;
 
+        /// <summary>
+        /// Get audit logs
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <param name="entity"></param>
+        /// <param name="take"></param>
+        /// <returns></returns>
         [HttpGet]
         public async Task<IActionResult> GetLogs(
             [FromQuery] int? userId, [FromQuery] string? entity, [FromQuery] int take = 50)

@@ -33,6 +33,7 @@ namespace DailyTrackerAPI.Data
         public DbSet<UserPresence> UserPresences { get; set; }
         public DbSet<Kudos> Kudos { get; set; }
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
+        public DbSet<LeaveEmailAction> LeaveEmailActions { get; set; }
 
         // ─── Feature 10: Attendance Enhanced ─────────────────────────────────
         public DbSet<Holiday> Holidays { get; set; }
