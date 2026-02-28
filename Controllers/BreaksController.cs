@@ -15,6 +15,11 @@ namespace DailyTrackerAPI.Controllers
         private readonly IBreakService _breakService;
         public BreaksController(IBreakService breakService) { _breakService = breakService; }
 
+        /// <summary>
+        /// Start break time 
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost("start")]
         public async Task<IActionResult> StartBreak([FromBody] StartBreakDto dto)
         {
@@ -23,6 +28,11 @@ namespace DailyTrackerAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// End break time
+        /// </summary>
+        /// <param name="breakId"></param>
+        /// <returns></returns>
         [HttpPut("end/{breakId}")]
         public async Task<IActionResult> EndBreak(int breakId)
         {
@@ -31,6 +41,10 @@ namespace DailyTrackerAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Get today all breaks 
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("today")]
         public async Task<IActionResult> GetTodayBreaks()
         {

@@ -3,6 +3,7 @@ using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 
 namespace DailyTrackerAPI.Controllers
 {
@@ -190,6 +191,28 @@ namespace DailyTrackerAPI.Controllers
             var managerId = User.GetUserId();
             var result = await _wfhService.GetTeamMonthlyAttendanceAsync(managerId, month, year);
             return Ok(result);
+        }
+
+        [AllowAnonymous]
+        [HttpPost("review")]
+        public async Task<IActionResult> ReviewFromEmail(string token, string status)
+        {
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(token));
+            var parts = decoded.Split('|');
+
+            var requestId = int.Parse(parts[0]);
+            var managerId = int.Parse(parts[1]);
+            var expiry = DateTime.Parse(parts[2]);
+
+            if (DateTime.UtcNow > expiry)
+                return BadRequest("Link expired.");
+
+            if (status == "Approved")
+                await _wfhService.ApproveAsync(managerId, requestId, "Approved via Email");
+            else
+                await _wfhService.RejectAsync(managerId, requestId, "Rejected via Email");
+
+            return Ok("Request processed successfully.");
         }
     }
 }

@@ -128,10 +128,23 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnMessageReceived = context =>
             {
+                // 🔥 1. Read JWT from cookie
+                var token = context.Request.Cookies["accessToken"];
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    context.Token = token;
+                }
+
+                // 🔥 2. Also allow SignalR query fallback
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
+
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
                     context.Token = accessToken;
+                }
+
                 return Task.CompletedTask;
             }
         };
@@ -147,7 +160,8 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins("http://localhost:3000")
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials(); 
         });
 });
 
@@ -221,7 +235,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Daily Tracker API v2"));
 }
 
-//app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 
 app.UseStaticFiles(); // Serve uploaded files from wwwroot (e.g. /uploads/support/...)
 

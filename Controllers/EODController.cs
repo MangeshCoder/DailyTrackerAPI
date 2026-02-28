@@ -7,13 +7,17 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace DailyTrackerAPI.Controllers
 {
-    // ─── EOD Report Controller ────────────────────────────────────────────────
     [ApiController, Route("api/eod"), Authorize]
     public class EODController : ControllerBase
     {
         private readonly IEODService _eodSvc;
         public EODController(IEODService eodSvc) => _eodSvc = eodSvc;
 
+        /// <summary>
+        /// Submit daily End Of the Day report
+        /// </summary>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPost]
         public async Task<IActionResult> Submit([FromBody] CreateEODReportDto dto)
         {
@@ -25,6 +29,10 @@ namespace DailyTrackerAPI.Controllers
             catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
         }
 
+        /// <summary>
+        /// Get today End of the report
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("today")]
         public async Task<IActionResult> GetToday()
         {
@@ -32,6 +40,11 @@ namespace DailyTrackerAPI.Controllers
             return Ok(report);
         }
 
+        /// <summary>
+        /// Get user EOD history
+        /// </summary>
+        /// <param name="days"></param>
+        /// <returns></returns>
         [HttpGet("history")]
         public async Task<IActionResult> GetHistory([FromQuery] int days = 14)
         {
@@ -39,6 +52,10 @@ namespace DailyTrackerAPI.Controllers
             return Ok(reports);
         }
 
+        /// <summary>
+        /// Get all pending EOD report review
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("pending"), Authorize(Roles = "Manager")]
         public async Task<IActionResult> GetPending()
         {
@@ -46,6 +63,12 @@ namespace DailyTrackerAPI.Controllers
             return Ok(reports);
         }
 
+        /// <summary>
+        /// Review EOD report 
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="dto"></param>
+        /// <returns></returns>
         [HttpPut("{id}/review"), Authorize(Roles = "Manager")]
         public async Task<IActionResult> Review(int id, [FromBody] ManagerReviewEODDto dto)
         {
