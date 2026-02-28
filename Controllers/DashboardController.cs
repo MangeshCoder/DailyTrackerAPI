@@ -14,6 +14,10 @@ namespace DailyTrackerAPI.Controllers
         private readonly IDashboardService _dashboardService;
         public DashboardController(IDashboardService dashboardService) { _dashboardService = dashboardService; }
 
+        /// <summary>
+        /// Get today user summary 
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("today")]
         public async Task<IActionResult> GetTodaySummary()
         {
@@ -21,6 +25,10 @@ namespace DailyTrackerAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Get user weekly summary
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("weekly")]
         public async Task<IActionResult> GetWeeklyReport()
         {
@@ -28,6 +36,10 @@ namespace DailyTrackerAPI.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Get team activity
+        /// </summary>
+        /// <returns></returns>
         [HttpGet("team")]
         [Authorize(Roles = "TeamLead,Manager")]
         public async Task<IActionResult> GetTeamActivity()

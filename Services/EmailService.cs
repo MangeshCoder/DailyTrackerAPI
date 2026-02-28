@@ -10,6 +10,8 @@ namespace DailyTrackerAPI.Services
         Task SendWelcomeEmailAsync(string email, string fullName);
         Task SendLeaveAppliedEmailAsync(string to, string managerName, string employeeName, LeaveRequest leave, string token);
         Task SendLeaveReviewedEmailAsync(string to, string employeeName, string managerName, LeaveRequest leave, string status, string? note);
+        Task SendWFHAppliedEmailAsync(string to,string managerName,string employeeName,WFHRequest request,string token);
+        Task SendWFHReviewedEmailAsync(string to,string employeeName,string managerName,WFHRequest request,string status,string? note);
     }
     public class EmailService : IEmailService
     {
@@ -161,11 +163,7 @@ namespace DailyTrackerAPI.Services
 
             await SendEmailAsync(email, subject, body);
         }
-        public async Task SendLeaveAppliedEmailAsync(
-        string to,
-        string managerName,
-        string employeeName,
-        LeaveRequest leave,string token)
+        public async Task SendLeaveAppliedEmailAsync(string to,string managerName,string employeeName,LeaveRequest leave,string token)
         {
             var subject = $"New Leave Request from {employeeName}";
 
@@ -241,13 +239,7 @@ namespace DailyTrackerAPI.Services
             await SendEmailAsync(to, subject, body);
         }
 
-        public async Task SendLeaveReviewedEmailAsync(
-            string to,
-            string employeeName,
-            string managerName,
-            LeaveRequest leave,
-            string status,
-            string? note)
+        public async Task SendLeaveReviewedEmailAsync(string to,string employeeName,string managerName,LeaveRequest leave,string status,string? note)
         {
             var subject = $"Your Leave Request is {status}";
 
@@ -350,6 +342,83 @@ namespace DailyTrackerAPI.Services
 
             </body>
             </html>";
+
+            await SendEmailAsync(to, subject, body);
+        }
+        public async Task SendWFHAppliedEmailAsync(string to,string managerName,string employeeName,WFHRequest request,string token)
+        {
+            var subject = $"New {request.RequestType} Request from {employeeName}";
+
+            var frontendUrl = _config["FrontendUrl"];
+
+            var approveUrl = $"{frontendUrl}/wfh-email-action?token={token}&status=Approved";
+            var rejectUrl = $"{frontendUrl}/wfh-email-action?token={token}&status=Rejected";
+
+            var body = $@"
+                <html>
+                <body style='font-family:Segoe UI;background:#f4f6f9;padding:30px;'>
+
+                <h2>New {request.RequestType} Request</h2>
+
+                <p>Hi <b>{managerName}</b>,</p>
+
+                <p><b>{employeeName}</b> applied for:</p>
+
+                <table>
+                    <tr><td><b>Date:</b></td><td>{request.RequestDate:dd MMM yyyy}</td></tr>
+                    <tr><td><b>Type:</b></td><td>{request.RequestType}</td></tr>
+                    {(request.RequestType == "HalfDay" ? $"<tr><td><b>Slot:</b></td><td>{request.HalfDaySlot}</td></tr>" : "")}
+                    <tr><td><b>Reason:</b></td><td>{request.Reason}</td></tr>
+                </table>
+
+                <br/>
+
+                <a href='{approveUrl}' 
+                   style='background:#16a34a;color:white;padding:10px 20px;
+                          text-decoration:none;border-radius:6px;margin-right:10px;'>
+                   Approve
+                </a>
+
+                <a href='{rejectUrl}'
+                   style='background:#dc2626;color:white;padding:10px 20px;
+                          text-decoration:none;border-radius:6px;'>
+                   Reject
+                </a>
+
+                <p style='margin-top:20px;font-size:12px;color:#777'>
+                    This link expires in 24 hours.
+                </p>
+
+                </body>
+                </html>";
+
+            await SendEmailAsync(to, subject, body);
+        }
+        public async Task SendWFHReviewedEmailAsync(string to,string employeeName,string managerName,WFHRequest request,string status,string? note)
+        {
+            var subject = $"Your {request.RequestType} Request is {status}";
+
+            var color = status == "Approved" ? "#16a34a" : "#dc2626";
+
+            var body = $@"
+                <html>
+                <body style='font-family:Segoe UI;background:#f4f6f9;padding:30px;'>
+
+                <h2 style='color:{color};'>
+                    {request.RequestType} Request {status}
+                </h2>
+
+                <p>Hi <b>{employeeName}</b>,</p>
+
+                <p>Your request for <b>{request.RequestDate:dd MMM yyyy}</b>
+                   has been <b>{status}</b> by {managerName}.</p>
+
+                {(string.IsNullOrEmpty(note) ? "" : $"<p><b>Manager Note:</b> {note}</p>")}
+
+                <p>Regards,<br/>Employee Management System</p>
+
+                </body>
+                </html>";
 
             await SendEmailAsync(to, subject, body);
         }

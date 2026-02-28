@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace DailyTrackerAPI.Controllers
 {
-    // ─── Goals Controller ─────────────────────────────────────────────────────
     [ApiController, Route("api/goals"), Authorize]
     public class GoalsController : ControllerBase
     {

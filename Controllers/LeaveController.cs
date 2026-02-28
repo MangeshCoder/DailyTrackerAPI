@@ -64,6 +64,9 @@ namespace DailyTrackerAPI.Controllers
         [HttpPost("email-review")]
         public async Task<IActionResult> EmailReview([FromBody] EmailReviewDto dto)
         {
+            if (string.IsNullOrEmpty(dto.Token) || string.IsNullOrEmpty(dto.Status))
+                return BadRequest("Invalid request");
+
             var action = await _context.LeaveEmailActions
                 .FirstOrDefaultAsync(x => x.Token == dto.Token);
 
@@ -76,7 +79,15 @@ namespace DailyTrackerAPI.Controllers
             if (action.ExpiryDate < DateTime.UtcNow)
                 return BadRequest("This link has expired");
 
-            // 🔥 USE EXISTING BUSINESS LOGIC
+            var leave = await _context.LeaveRequests
+                .FirstOrDefaultAsync(x => x.Id == action.LeaveId);
+
+            if (leave == null)
+                return BadRequest("Leave not found");
+
+            if (leave.Status != "Pending")
+                return BadRequest("Leave already processed");
+
             await _leaveSvc.ReviewAsync(
                 action.LeaveId,
                 action.ManagerId,
