@@ -5,6 +5,7 @@ using DailyTrackerAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace DailyTrackerAPI.Controllers
 {
@@ -273,7 +274,7 @@ namespace DailyTrackerAPI.Controllers
                 FullName = dto.FullName,
                 Email = dto.Email,
                 Password = dto.Password,
-                Role = dto.Role
+                //Role = dto.Role
             };
 
             var result = await _authSvc.RegisterAsync(registerDto,
@@ -305,6 +306,8 @@ namespace DailyTrackerAPI.Controllers
 
                 if (!result.RequiresTwoFactor)
                 {
+                    Response.Cookies.Delete("accessToken");
+                    Response.Cookies.Delete("refreshToken");
                     SetAuthCookies(result.Tokens);
                     return Ok(new { user = result.Tokens.User });
                 }
@@ -366,6 +369,66 @@ namespace DailyTrackerAPI.Controllers
             await _db.SaveChangesAsync();
 
             return Ok(new { message = "Password reset successful." });
+        }
+
+        [Authorize]   
+        [HttpGet("me")]
+        public IActionResult Me()
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            var user = _db.Users
+                .Where(u => u.Id == userId)
+                .Select(u => new {
+                    u.Id,
+                    u.FullName,
+                    u.Email,
+                    u.Role
+                })
+                .First();
+
+            return Ok(user);
+        }
+
+        [Authorize(Roles = "Manager")]
+        [HttpPost("assign-role")]
+        public async Task<IActionResult> AssignRole(AssignRoleDto dto)
+        {
+            var user = await _db.Users.FindAsync(dto.UserId);
+            if (user == null)
+                return NotFound("User not found");
+
+            var currentManagerId = User.GetUserId();
+
+            if (dto.Role == "Manager")
+            {
+                user.Role = "Manager";
+                user.ManagerId = null;
+            }
+            else if (dto.Role == "Developer" || dto.Role == "TeamLead")
+            {
+                user.Role = dto.Role;
+                user.ManagerId = currentManagerId;
+            }
+            else
+            {
+                return BadRequest("Invalid role.");
+            }
+
+            await _db.SaveChangesAsync();
+
+            return Ok("Role assigned successfully");
+        }
+
+        [Authorize(Roles = "Manager")]
+        [HttpGet("pending-users")]
+        public async Task<IActionResult> GetPendingUsers()
+        {
+            var users = await _db.Users
+                .Where(u => u.Role == "Pending")
+                .ToListAsync();
+
+            return Ok(users);
         }
 
         private void SetAuthCookies(AuthResponseV2Dto tokens)

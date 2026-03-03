@@ -33,7 +33,7 @@ namespace DailyTrackerAPI.Services
             {
                 FullName = dto.FullName,
                 Email = dto.Email,
-                Role = dto.Role,
+               // Role = dto.Role,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
             };
 
