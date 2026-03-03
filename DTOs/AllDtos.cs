@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DailyTrackerAPI.DTOs
 {
@@ -9,7 +10,7 @@ namespace DailyTrackerAPI.DTOs
         [Required] public string FullName { get; set; } = string.Empty;
         [Required, EmailAddress] public string Email { get; set; } = string.Empty;
         [Required, MinLength(6)] public string Password { get; set; } = string.Empty;
-        public string Role { get; set; } = "Developer";
+        //public string Role { get; set; } = "Developer";
     }
 
     public class LoginDto
@@ -725,7 +726,7 @@ namespace DailyTrackerAPI.DTOs
         public string FullName { get; set; }
         public string Email { get; set; }
         public string Password { get; set; }
-        public string Role { get; set; }
+       // public string Role { get; set; }
         public string Code { get; set; }
     }
 
@@ -742,4 +743,123 @@ namespace DailyTrackerAPI.DTOs
         public int UsedDays { get; set; }
         public int RemainingDays { get; set; }
     }
+
+    public class CreateGroupDto
+    {
+        public string GroupName { get; set; } = string.Empty;
+        public string? GroupAvatar { get; set; }
+        public List<int> MemberIds { get; set; } = new();
+    }
+
+    public class SendMessageDto
+    {
+        public int ConversationId { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public string? MessageType { get; set; } = "Text";
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentName { get; set; }
+        public int? ReplyToMessageId { get; set; }
+    }
+
+    public class ConversationDto
+    {
+        public int Id { get; set; }
+        public string Type { get; set; } = "";
+        public string DisplayName { get; set; } = "";
+        public string? GroupAvatar { get; set; }
+        public int? OtherUserId { get; set; }
+        public int UnreadCount { get; set; }
+        public DateTime? LastMessageAt { get; set; }
+        public string? LastMessagePreview { get; set; }
+        public int MemberCount { get; set; }
+    }
+
+    public class ConversationSummaryDto : ConversationDto
+    {
+        public bool IsMuted { get; set; }
+        public string? AvatarUrl { get; set; }
+    }
+
+    public class ConversationDetailDto
+    {
+        public int Id { get; set; }
+        public string Type { get; set; } = "";
+        public string? GroupName { get; set; }
+        public string? GroupAvatar { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string MyRole { get; set; } = "";
+        public List<MemberDto> Members { get; set; } = new();
+    }
+
+    public class MemberDto
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Role { get; set; } = "";
+        public DateTime JoinedAt { get; set; }
+    }
+
+    public class ChatMessageDto
+    {
+        public int Id { get; set; }
+        public int ConversationId { get; set; }
+        public int? SenderId { get; set; }
+        public string SenderName { get; set; } = "";
+        public string SenderInitial { get; set; } = "";
+        public string Content { get; set; } = "";
+        public string MessageType { get; set; } = "Text";
+        public string? AttachmentUrl { get; set; }
+        public string? AttachmentName { get; set; }
+        public bool IsDeleted { get; set; }
+        public bool IsEdited { get; set; }
+        public DateTime SentAt { get; set; }
+        public DateTime? EditedAt { get; set; }
+        public ReplyPreviewDto? ReplyTo { get; set; }
+        public List<ReactionDto> Reactions { get; set; } = new();
+        public List<int> ReadByUserIds { get; set; } = new();
+    }
+
+    public class ReplyPreviewDto
+    {
+        public int Id { get; set; }
+        public string SenderName { get; set; } = "";
+        public string ContentPreview { get; set; } = "";
+    }
+
+    public class ReactionDto
+    {
+        public string Emoji { get; set; } = "";
+        public int Count { get; set; }
+        public List<int> UserIds { get; set; } = new();
+    }
+
+    public class ReactionResult
+    {
+        public int MessageId { get; set; }
+        public string Emoji { get; set; } = "";
+        public bool Added { get; set; }
+        public Dictionary<string, int> ReactionCounts { get; set; } = new();
+    }
+
+    public class UserChatProfileDto
+    {
+        public int Id { get; set; }
+        public string FullName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Role { get; set; } = "";
+        public string OnlineStatus { get; set; } = "Offline";
+        public string? StatusMessage { get; set; }
+    }
+    public class AssignRoleDto
+    {
+        public int UserId { get; set; }
+        public string Role { get; set; } = string.Empty;
+        public int? ManagerId { get; set; }
+    }
+
+    public class EditMessageDto { public string Content { get; set; } = ""; }
+    public class ReactDto { public string Emoji { get; set; } = ""; }
+    public class AddMembersDto { public List<int> UserIds { get; set; } = new(); }
+    public class UpdateGroupDto { public string? GroupName { get; set; } public string? GroupAvatar { get; set; } }
 }

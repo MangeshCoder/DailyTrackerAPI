@@ -48,6 +48,15 @@ namespace DailyTrackerAPI.Data
         public DbSet<PendingLogin> PendingLogins { get; set; }
         public DbSet<WFHRequest> WFHRequests { get; set; }
         public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
+
+        // ─── Chat System ──────────────────────────────────────────────────────────
+        public DbSet<Conversation> Conversations { get; set; }
+        public DbSet<ConversationMember> ConversationMembers { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
+        public DbSet<MessageReadReceipt> MessageReadReceipts { get; set; }
+        public DbSet<MessageReaction> MessageReactions { get; set; }
+
+
         protected override void OnModelCreating(ModelBuilder mb)
         {
 
@@ -248,6 +257,76 @@ namespace DailyTrackerAPI.Data
 
                 // Performance index
                 entity.HasIndex(e => new { e.Email, e.Purpose });
+            });
+
+            // ── Conversation
+            mb.Entity<Conversation>(e =>
+            {
+                e.HasIndex(c => c.LastMessageAt);
+                e.HasOne(c => c.CreatedBy)
+                 .WithMany()
+                 .HasForeignKey(c => c.CreatedByUserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── ConversationMember
+            mb.Entity<ConversationMember>(e =>
+            {
+                e.HasIndex(m => new { m.ConversationId, m.UserId }).IsUnique();
+                e.HasOne(m => m.Conversation)
+                 .WithMany(c => c.Members)
+                 .HasForeignKey(m => m.ConversationId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(m => m.User)
+                 .WithMany()
+                 .HasForeignKey(m => m.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── ChatMessage
+            mb.Entity<ChatMessage>(e =>
+            {
+                e.HasIndex(m => new { m.ConversationId, m.SentAt });
+                e.HasOne(m => m.Conversation)
+                 .WithMany(c => c.Messages)
+                 .HasForeignKey(m => m.ConversationId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(m => m.Sender)
+                 .WithMany()
+                 .HasForeignKey(m => m.SenderId)
+                 .OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(m => m.ReplyToMessage)
+                 .WithMany()
+                 .HasForeignKey(m => m.ReplyToMessageId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── MessageReadReceipt
+            mb.Entity<MessageReadReceipt>(e =>
+            {
+                e.HasIndex(r => new { r.MessageId, r.UserId }).IsUnique();
+                e.HasOne(r => r.Message)
+                 .WithMany(m => m.ReadReceipts)
+                 .HasForeignKey(r => r.MessageId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(r => r.User)
+                 .WithMany()
+                 .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── MessageReaction
+            mb.Entity<MessageReaction>(e =>
+            {
+                e.HasIndex(r => new { r.MessageId, r.UserId }).IsUnique(); // one reaction per user per message
+                e.HasOne(r => r.Message)
+                 .WithMany(m => m.Reactions)
+                 .HasForeignKey(r => r.MessageId)
+                 .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(r => r.User)
+                 .WithMany()
+                 .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

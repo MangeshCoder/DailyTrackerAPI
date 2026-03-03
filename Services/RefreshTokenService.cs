@@ -40,35 +40,68 @@ namespace DailyTrackerAPI.Services
             _twoFactor = twoFactor;
         }
 
+        //public async Task<AuthResponseV2Dto> RegisterAsync(RegisterDto dto, string? ipAddress)
+        //{
+        //    if (await _db.Users.AnyAsync(u => u.Email == dto.Email))
+        //        throw new Exception("Email already exists.");
+
+        //    int? managerId = null;
+
+        //    // Auto-assign default manager for Developer / TeamLead
+        //    if (dto.Role == "Developer" || dto.Role == "TeamLead")
+        //    {
+        //        var defaultManager = await _db.Users
+        //            .Where(u => u.Role == "Manager")
+        //            .OrderBy(u => u.Id) // first manager
+        //            .FirstOrDefaultAsync();
+
+        //        if (defaultManager == null)
+        //            throw new Exception("No manager available. Please create a manager first.");
+
+        //        managerId = defaultManager.Id;
+        //    }
+
+        //    var user = new User
+        //    {
+        //        FullName = dto.FullName,
+        //        Email = dto.Email,
+        //        Role = dto.Role,
+        //        ManagerId = managerId,
+        //        PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+        //        IsActive = true
+        //    };
+
+        //    _db.Users.Add(user);
+        //    await _db.SaveChangesAsync();
+
+        //    return await GenerateTokensAsync(user, ipAddress);
+        //}
+
         public async Task<AuthResponseV2Dto> RegisterAsync(RegisterDto dto, string? ipAddress)
         {
             if (await _db.Users.AnyAsync(u => u.Email == dto.Email))
                 throw new Exception("Email already exists.");
 
+            var anyUserExists = await _db.Users.AnyAsync();
+
+            string role = "Pending";   // Default role
             int? managerId = null;
 
-            // Auto-assign default manager for Developer / TeamLead
-            if (dto.Role == "Developer" || dto.Role == "TeamLead")
+            // ✅ First user becomes Manager automatically
+            if (!anyUserExists)
             {
-                var defaultManager = await _db.Users
-                    .Where(u => u.Role == "Manager")
-                    .OrderBy(u => u.Id) // first manager
-                    .FirstOrDefaultAsync();
-
-                if (defaultManager == null)
-                    throw new Exception("No manager available. Please create a manager first.");
-
-                managerId = defaultManager.Id;
+                role = "Manager";
             }
 
             var user = new User
             {
                 FullName = dto.FullName,
                 Email = dto.Email,
-                Role = dto.Role,
+                Role = role,
                 ManagerId = managerId,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                IsActive = true
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
             };
 
             _db.Users.Add(user);
@@ -93,6 +126,7 @@ namespace DailyTrackerAPI.Services
 
             // Check if 2FA is enabled
             var twoFactorEnabled = await _twoFactor.IsTwoFactorEnabledAsync(user.Id);
+            await RevokeAllForUserAsync(user.Id);
 
             if (twoFactorEnabled)
             {
@@ -102,6 +136,7 @@ namespace DailyTrackerAPI.Services
                     return new LoginResponseDto
                     {
                         RequiresTwoFactor = false,
+
                         Tokens = await GenerateTokensAsync(user, ipAddress)
                     };
                 }
@@ -167,6 +202,9 @@ namespace DailyTrackerAPI.Services
 
             if (!user.IsActive)
                 throw new UnauthorizedAccessException("Your account is deactivated. Contact manager.");
+
+            // 🔥 ADD THIS
+            await RevokeAllForUserAsync(user.Id);
 
             var twoFactorEnabled = await _twoFactor.IsTwoFactorEnabledAsync(user.Id);
 
