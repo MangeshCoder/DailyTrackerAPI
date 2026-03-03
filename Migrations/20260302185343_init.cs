@@ -6,11 +6,28 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace DailyTrackerAPI.Migrations
 {
     /// <inheritdoc />
-    public partial class Init : Migration
+    public partial class init : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "EmailOtps",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    Code = table.Column<string>(type: "nvarchar(6)", maxLength: 6, nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsUsed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    Purpose = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_EmailOtps", x => x.Id);
+                });
+
             migrationBuilder.CreateTable(
                 name: "Holidays",
                 columns: table => new
@@ -28,6 +45,24 @@ namespace DailyTrackerAPI.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "LeaveEmailActions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    LeaveId = table.Column<int>(type: "int", nullable: false),
+                    ManagerId = table.Column<int>(type: "int", nullable: false),
+                    Token = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsUsed = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LeaveEmailActions", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Users",
                 columns: table => new
                 {
@@ -38,11 +73,18 @@ namespace DailyTrackerAPI.Migrations
                     PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Role = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    ManagerId = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Users", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Users_Users_ManagerId",
+                        column: x => x.ManagerId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -69,6 +111,32 @@ namespace DailyTrackerAPI.Migrations
                         principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Conversations",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Type = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    GroupName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    GroupAvatar = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CreatedByUserId = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    LastMessageAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    LastMessagePreview = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Conversations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Conversations_Users_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -212,6 +280,30 @@ namespace DailyTrackerAPI.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PendingLogins",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    TempToken = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    IpAddress = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsUsed = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PendingLogins", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PendingLogins_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "RefreshTokens",
                 columns: table => new
                 {
@@ -265,6 +357,31 @@ namespace DailyTrackerAPI.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "TrustedDevices",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    DeviceToken = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    DeviceName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IpAddress = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TrustedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsRevoked = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TrustedDevices", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_TrustedDevices_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "UserPresences",
                 columns: table => new
                 {
@@ -285,6 +402,109 @@ namespace DailyTrackerAPI.Migrations
                         principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserTwoFactors",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    TotpEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    TotpSecretKey = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    TotpBackupCodes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    EmailOtpEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    PendingOtpCode = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    OtpExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    OtpAttempts = table.Column<int>(type: "int", nullable: false),
+                    OtpPurpose = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    LastVerifiedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserTwoFactors", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_UserTwoFactors_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ChatMessages",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ConversationId = table.Column<int>(type: "int", nullable: false),
+                    SenderId = table.Column<int>(type: "int", nullable: true),
+                    Content = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: false),
+                    MessageType = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    AttachmentUrl = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    AttachmentName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    ReplyToMessageId = table.Column<int>(type: "int", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    IsEdited = table.Column<bool>(type: "bit", nullable: false),
+                    SentAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    EditedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ChatMessages", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ChatMessages_ChatMessages_ReplyToMessageId",
+                        column: x => x.ReplyToMessageId,
+                        principalTable: "ChatMessages",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_ChatMessages_Conversations_ConversationId",
+                        column: x => x.ConversationId,
+                        principalTable: "Conversations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ChatMessages_Users_SenderId",
+                        column: x => x.SenderId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ConversationMembers",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ConversationId = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    Role = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    JoinedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    HasLeft = table.Column<bool>(type: "bit", nullable: false),
+                    LeftAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    LastReadAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    IsMuted = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ConversationMembers", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ConversationMembers_Conversations_ConversationId",
+                        column: x => x.ConversationId,
+                        principalTable: "Conversations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ConversationMembers_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -435,6 +655,135 @@ namespace DailyTrackerAPI.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "WFHRequests",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    RequestType = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    RequestDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    HalfDaySlot = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    Reason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    ReviewedByUserId = table.Column<int>(type: "int", nullable: true),
+                    ReviewNote = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    ReviewedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    DailyLogId = table.Column<int>(type: "int", nullable: true),
+                    RequestedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_WFHRequests", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_WFHRequests_DailyLogs_DailyLogId",
+                        column: x => x.DailyLogId,
+                        principalTable: "DailyLogs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_WFHRequests_Users_ReviewedByUserId",
+                        column: x => x.ReviewedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_WFHRequests_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "MessageReactions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MessageId = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    Emoji = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    ReactedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MessageReactions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_MessageReactions_ChatMessages_MessageId",
+                        column: x => x.MessageId,
+                        principalTable: "ChatMessages",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_MessageReactions_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "MessageReadReceipts",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MessageId = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    ReadAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MessageReadReceipts", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_MessageReadReceipts_ChatMessages_MessageId",
+                        column: x => x.MessageId,
+                        principalTable: "ChatMessages",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_MessageReadReceipts_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "MediaEvidences",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<int>(type: "int", nullable: false),
+                    MediaType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FileName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FilePath = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ThumbnailPath = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    FileSizeBytes = table.Column<long>(type: "bigint", nullable: false),
+                    MimeType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    SupportLogId = table.Column<int>(type: "int", nullable: true),
+                    UploadedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MediaEvidences", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_MediaEvidences_SupportLogs_SupportLogId",
+                        column: x => x.SupportLogId,
+                        principalTable: "SupportLogs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_MediaEvidences_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
                 name: "TaskTimers",
                 columns: table => new
                 {
@@ -468,6 +817,42 @@ namespace DailyTrackerAPI.Migrations
                 column: "DailyLogId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ChatMessages_ConversationId_SentAt",
+                table: "ChatMessages",
+                columns: new[] { "ConversationId", "SentAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatMessages_ReplyToMessageId",
+                table: "ChatMessages",
+                column: "ReplyToMessageId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatMessages_SenderId",
+                table: "ChatMessages",
+                column: "SenderId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ConversationMembers_ConversationId_UserId",
+                table: "ConversationMembers",
+                columns: new[] { "ConversationId", "UserId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ConversationMembers_UserId",
+                table: "ConversationMembers",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Conversations_CreatedByUserId",
+                table: "Conversations",
+                column: "CreatedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Conversations_LastMessageAt",
+                table: "Conversations",
+                column: "LastMessageAt");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_DailyGoals_UserId_GoalDate",
                 table: "DailyGoals",
                 columns: new[] { "UserId", "GoalDate" },
@@ -478,6 +863,11 @@ namespace DailyTrackerAPI.Migrations
                 table: "DailyLogs",
                 columns: new[] { "UserId", "LogDate" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EmailOtps_Email_Purpose",
+                table: "EmailOtps",
+                columns: new[] { "Email", "Purpose" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_EODReports_DailyLogId",
@@ -527,8 +917,51 @@ namespace DailyTrackerAPI.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_MediaEvidences_SupportLogId",
+                table: "MediaEvidences",
+                column: "SupportLogId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MediaEvidences_UserId",
+                table: "MediaEvidences",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageReactions_MessageId_UserId",
+                table: "MessageReactions",
+                columns: new[] { "MessageId", "UserId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageReactions_UserId",
+                table: "MessageReactions",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageReadReceipts_MessageId_UserId",
+                table: "MessageReadReceipts",
+                columns: new[] { "MessageId", "UserId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MessageReadReceipts_UserId",
+                table: "MessageReadReceipts",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Notifications_UserId",
                 table: "Notifications",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PendingLogins_TempToken",
+                table: "PendingLogins",
+                column: "TempToken",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PendingLogins_UserId",
+                table: "PendingLogins",
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
@@ -568,6 +1001,11 @@ namespace DailyTrackerAPI.Migrations
                 column: "TaskLogId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_TrustedDevices_UserId_DeviceToken",
+                table: "TrustedDevices",
+                columns: new[] { "UserId", "DeviceToken" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_UserPresences_UserId",
                 table: "UserPresences",
                 column: "UserId",
@@ -578,6 +1016,32 @@ namespace DailyTrackerAPI.Migrations
                 table: "Users",
                 column: "Email",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_ManagerId",
+                table: "Users",
+                column: "ManagerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserTwoFactors_UserId",
+                table: "UserTwoFactors",
+                column: "UserId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WFHRequests_DailyLogId",
+                table: "WFHRequests",
+                column: "DailyLogId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WFHRequests_ReviewedByUserId",
+                table: "WFHRequests",
+                column: "ReviewedByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WFHRequests_UserId_RequestDate_Status",
+                table: "WFHRequests",
+                columns: new[] { "UserId", "RequestDate", "Status" });
         }
 
         /// <inheritdoc />
@@ -590,7 +1054,13 @@ namespace DailyTrackerAPI.Migrations
                 name: "BreakLogs");
 
             migrationBuilder.DropTable(
+                name: "ConversationMembers");
+
+            migrationBuilder.DropTable(
                 name: "DailyGoals");
+
+            migrationBuilder.DropTable(
+                name: "EmailOtps");
 
             migrationBuilder.DropTable(
                 name: "EODReports");
@@ -605,16 +1075,28 @@ namespace DailyTrackerAPI.Migrations
                 name: "LateArrivalReasons");
 
             migrationBuilder.DropTable(
+                name: "LeaveEmailActions");
+
+            migrationBuilder.DropTable(
                 name: "LeaveRequests");
+
+            migrationBuilder.DropTable(
+                name: "MediaEvidences");
+
+            migrationBuilder.DropTable(
+                name: "MessageReactions");
+
+            migrationBuilder.DropTable(
+                name: "MessageReadReceipts");
 
             migrationBuilder.DropTable(
                 name: "Notifications");
 
             migrationBuilder.DropTable(
-                name: "RefreshTokens");
+                name: "PendingLogins");
 
             migrationBuilder.DropTable(
-                name: "SupportLogs");
+                name: "RefreshTokens");
 
             migrationBuilder.DropTable(
                 name: "TaskTemplates");
@@ -623,10 +1105,28 @@ namespace DailyTrackerAPI.Migrations
                 name: "TaskTimers");
 
             migrationBuilder.DropTable(
+                name: "TrustedDevices");
+
+            migrationBuilder.DropTable(
                 name: "UserPresences");
 
             migrationBuilder.DropTable(
+                name: "UserTwoFactors");
+
+            migrationBuilder.DropTable(
+                name: "WFHRequests");
+
+            migrationBuilder.DropTable(
+                name: "SupportLogs");
+
+            migrationBuilder.DropTable(
+                name: "ChatMessages");
+
+            migrationBuilder.DropTable(
                 name: "TaskLogs");
+
+            migrationBuilder.DropTable(
+                name: "Conversations");
 
             migrationBuilder.DropTable(
                 name: "DailyLogs");

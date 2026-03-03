@@ -101,6 +101,7 @@ builder.Services.AddScoped<IWFHRequestService, WFHRequestService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
 builder.Services.AddScoped<IEmailActionService, EmailActionService>();
+builder.Services.AddScoped<IChatService, ChatService>();
 
 builder.Services.AddHttpClient();
 
@@ -250,6 +251,7 @@ app.MapControllers();
 
 // ─── SignalR Hubs ─────────────────────────────────────────────────────────────
 app.MapHub<NotificationHub>("/hubs/notifications");
+app.MapHub<ChatHub>("/hubs/chat");
 
 // ─── Health Check Endpoint ────────────────────────────────────────────────────
 app.MapHealthChecks("/health");
