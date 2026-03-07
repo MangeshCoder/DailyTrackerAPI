@@ -7,6 +7,12 @@ namespace DailyTrackerAPI.Services
 {
     // ─────────────────────────────────────────────────────────────────────────
     //  Feature 1: Notification Service
+    //
+    //  ONLY CHANGE from your original:
+    //    1. Added CreateForUsersAsync to the interface  (line 16)
+    //    2. Added CreateForUsersAsync implementation    (below CreateAsync)
+    //
+    //  Every other line is identical to your original code.
     // ─────────────────────────────────────────────────────────────────────────
     public interface IAppNotificationService
     {
@@ -15,6 +21,12 @@ namespace DailyTrackerAPI.Services
         Task MarkAllReadAsync(int userId);
         Task<int> GetUnreadCountAsync(int userId);
         Task CreateAsync(int userId, string title, string message, string type = "Info", string? actionUrl = null);
+
+        // ── ADDED for NotificationSchedulerService ────────────────────────────
+        // Scheduler needs to notify a LIST of users with one call.
+        // Calling CreateAsync in a loop = N separate DB round-trips.
+        // This method does one AddRange + one SaveChangesAsync for all users.
+        Task CreateForUsersAsync(IEnumerable<int> userIds, string title, string message, string type = "Reminder", string? actionUrl = null);
     }
 
     public class AppNotificationService : IAppNotificationService
@@ -27,6 +39,8 @@ namespace DailyTrackerAPI.Services
             _db = db;
             _sender = sender;
         }
+
+        // ── ALL METHODS BELOW ARE IDENTICAL TO YOUR ORIGINAL ─────────────────
 
         public async Task<List<NotificationDto>> GetMyNotificationsAsync(int userId, bool unreadOnly = false)
         {
@@ -85,6 +99,58 @@ namespace DailyTrackerAPI.Services
                 Type = type,
                 ActionUrl = actionUrl
             });
+        }
+
+        // ── ADDED: bulk create for NotificationSchedulerService ───────────────
+        //
+        // Called by the scheduler's 4 jobs, e.g.:
+        //   await svc.CreateForUsersAsync(userIds, "📝 EOD Reminder", "...", "Reminder");
+        //
+        // Flow:
+        //   1. Deduplicate the userIds list
+        //   2. Build one AppNotification row per user (same title/message/type for all)
+        //   3. AddRange → ONE SaveChangesAsync (single DB round-trip regardless of count)
+        //   4. Loop and SendToUser per user via SignalR
+        //      → each lands in that user's personal "user_{id}" SignalR group
+        //      → if user is offline, push silently no-ops; notification is already in DB
+        //        and will appear in the bell when they next open the app
+        public async Task CreateForUsersAsync(
+            IEnumerable<int> userIds,
+            string title,
+            string message,
+            string type = "Reminder",
+            string? actionUrl = null)
+        {
+            var list = userIds.Distinct().ToList();
+            if (list.Count == 0) return;
+
+            var notifications = list.Select(uid => new AppNotification
+            {
+                UserId = uid,
+                Title = title,
+                Message = message,
+                Type = type,
+                ActionUrl = actionUrl,
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            }).ToList();
+
+            _db.Notifications.AddRange(notifications);
+            await _db.SaveChangesAsync();
+
+            // Push to each user's personal SignalR group
+            // Shape matches what your existing ReceiveNotification handler expects:
+            //   const n = data as { title: string; message: string; type: string };
+            foreach (var n in notifications)
+            {
+                await _sender.SendToUser(n.UserId, "ReceiveNotification", new
+                {
+                    n.Title,
+                    n.Message,
+                    n.Type,
+                    n.ActionUrl
+                });
+            }
         }
     }
 }

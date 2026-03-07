@@ -103,6 +103,8 @@ builder.Services.AddScoped<IEmailOtpService, EmailOtpService>();
 builder.Services.AddScoped<IEmailActionService, EmailActionService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddHttpClient<IAiService, GeminiService>();
+// Add after your existing service registrations:
+builder.Services.AddHostedService<NotificationSchedulerService>();
 
 builder.Services.AddHttpClient();
 
