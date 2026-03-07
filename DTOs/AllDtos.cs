@@ -125,6 +125,7 @@ namespace DailyTrackerAPI.DTOs
         public int TargetWorkMinutes { get; set; } = 480;
         public int TargetTasksCompleted { get; set; } = 5;
         public int TargetBreakMinutes { get; set; } = 60;
+        public int TargetSupportGiven { get; set; } = 5;
         public string? ManagerSetNote { get; set; }
     }
 
@@ -322,6 +323,7 @@ namespace DailyTrackerAPI.DTOs
         public double Score { get; set; }
         public int WorkMinutes { get; set; }
         public int TasksCompleted { get; set; }
+        public int SupportLogsCompleted { get; set; }
         public string DayName { get; set; } = string.Empty;
     }
 
@@ -352,9 +354,11 @@ namespace DailyTrackerAPI.DTOs
         public SetGoalDto Goal { get; set; } = null!;
         public int ActualWorkMinutes { get; set; }
         public int ActualTasksCompleted { get; set; }
+        public int ActualSupportGiven { get; set; }
         public int ActualBreakMinutes { get; set; }
         public double WorkProgress { get; set; }     // 0–100
         public double TaskProgress { get; set; }
+        public double SupportProgress { get; set; }
         public double BreakProgress { get; set; }
         public double ProductivityScore { get; set; } // 0–100
         public string ScoreGrade { get; set; } = string.Empty; // A, B, C, D
@@ -862,4 +866,51 @@ namespace DailyTrackerAPI.DTOs
     public class ReactDto { public string Emoji { get; set; } = ""; }
     public class AddMembersDto { public List<int> UserIds { get; set; } = new(); }
     public class UpdateGroupDto { public string? GroupName { get; set; } public string? GroupAvatar { get; set; } }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  GoalHistoryDto  —  one entry per calendar day
+    //
+    //  Returned by GET /api/goals/history?from=2025-01-01&to=2025-01-31
+    //
+    //  WHY a separate DTO and not reuse GoalProgressDto?
+    //    GoalProgressDto is designed for today's LIVE view — it recalculates
+    //    work minutes from CheckInTime in real time if the user is still checked in.
+    //    History entries are always complete/settled days, so we can use the
+    //    stored TotalWorkMinutes directly. The shape is also simpler — no insights
+    //    list, no live recalc needed.
+    //
+    //  Days with a DailyLog but no DailyGoal: targets will be 0 (user didn't
+    //    set a goal that day). The UI treats 0 targets as "no goal set".
+    //  Days with no DailyLog at all: the entry is skipped (not returned).
+    // ─────────────────────────────────────────────────────────────────────────
+    public class GoalHistoryDto
+    {
+        // ── When ─────────────────────────────────────────────────────────────
+        public DateTime Date { get; set; }
+        public string DayName { get; set; } = string.Empty;    // "Mon", "Tue" …
+        public string DateLabel { get; set; } = string.Empty;  // "Jan 15"
+
+        // ── Targets (0 if no goal was set that day) ───────────────────────────
+        public int TargetWorkMinutes { get; set; }
+        public int TargetTasksCompleted { get; set; }
+        public int TargetSupportGiven { get; set; }
+        public int TargetBreakMinutes { get; set; }
+
+        // ── Actuals ───────────────────────────────────────────────────────────
+        public int ActualWorkMinutes { get; set; }
+        public int ActualTasksCompleted { get; set; }
+        public int ActualSupportGiven { get; set; }
+        public int ActualBreakMinutes { get; set; }
+
+        // ── Progress (0–100) ──────────────────────────────────────────────────
+        public double WorkProgress { get; set; }
+        public double TaskProgress { get; set; }
+        public double SupportProgress { get; set; }
+        public double BreakProgress { get; set; }
+
+        // ── Score ─────────────────────────────────────────────────────────────
+        public double ProductivityScore { get; set; }
+        public string ScoreGrade { get; set; } = string.Empty; // A, B, C, D
+        public bool GoalWasSet { get; set; }  // false = worked but no goal configured
+    }
 }
