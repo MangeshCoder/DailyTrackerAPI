@@ -4,6 +4,7 @@ using DailyTrackerAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DailyTrackerAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260308041905_addAnnouncementTable")]
+    partial class addAnnouncementTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1099,20 +1102,8 @@ namespace DailyTrackerAPI.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Bio")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("Department")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Designation")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -1127,23 +1118,12 @@ namespace DailyTrackerAPI.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<DateTime?>("JoinDate")
-                        .HasColumnType("datetime2");
-
                     b.Property<int?>("ManagerId")
                         .HasColumnType("int");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("ProfilePhotoUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Role")
                         .IsRequired()

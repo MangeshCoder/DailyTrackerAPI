@@ -81,7 +81,11 @@ namespace DailyTrackerAPI.Services
             Id = u.Id,
             FullName = u.FullName,
             Email = u.Email,
-            Role = u.Role
+            Role = u.Role,
+            IsActive = u.IsActive,
+            Department = u.Department,
+            Designation = u.Designation,
+            ProfilePhotoUrl = u.ProfilePhotoUrl
         };
     }
 }

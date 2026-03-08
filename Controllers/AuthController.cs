@@ -371,22 +371,31 @@ namespace DailyTrackerAPI.Controllers
             return Ok(new { message = "Password reset successful." });
         }
 
-        [Authorize]   
+        [Authorize]
         [HttpGet("me")]
-        public IActionResult Me()
+        public async Task<IActionResult> Me()
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var userId = User.GetUserId();
 
-            var user = _db.Users
+            var user = await _db.Users
                 .Where(u => u.Id == userId)
-                .Select(u => new {
+                .Select(u => new
+                {
                     u.Id,
                     u.FullName,
                     u.Email,
-                    u.Role
+                    u.Role,
+                    u.IsActive,
+                    u.Department,
+                    u.Designation,
+                    u.ProfilePhotoUrl,
+                    u.Phone,
+                    u.Bio,
+                    u.JoinDate
                 })
-                .First();
+                .FirstOrDefaultAsync();
 
+            if (user == null) return NotFound();
             return Ok(user);
         }
 

@@ -3,18 +3,23 @@ using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Controllers
 {
     // ─── Leave Controller ─────────────────────────────────────────────────────
+    //
+    //  CHANGE FROM ORIGINAL:
+    //    GetBalance now calls GetAnnualBalanceAsync instead of GetMonthlyBalanceAsync.
+    //    Everything else is identical.
+    // ─────────────────────────────────────────────────────────────────────────
     [ApiController, Route("api/leave"), Authorize]
     public class LeaveController : ControllerBase
     {
         private readonly ILeaveService _leaveSvc;
         private readonly AppDbContext _context;
+
         public LeaveController(ILeaveService leaveSvc, AppDbContext context)
         {
             _leaveSvc = leaveSvc;
@@ -70,32 +75,19 @@ namespace DailyTrackerAPI.Controllers
             var action = await _context.LeaveEmailActions
                 .FirstOrDefaultAsync(x => x.Token == dto.Token);
 
-            if (action == null)
-                return BadRequest("Invalid token");
-
-            if (action.IsUsed)
-                return BadRequest("This link has already been used");
-
-            if (action.ExpiryDate < DateTime.UtcNow)
-                return BadRequest("This link has expired");
+            if (action == null) return BadRequest("Invalid token");
+            if (action.IsUsed) return BadRequest("This link has already been used");
+            if (action.ExpiryDate < DateTime.UtcNow) return BadRequest("This link has expired");
 
             var leave = await _context.LeaveRequests
                 .FirstOrDefaultAsync(x => x.Id == action.LeaveId);
 
-            if (leave == null)
-                return BadRequest("Leave not found");
-
-            if (leave.Status != "Pending")
-                return BadRequest("Leave already processed");
+            if (leave == null) return BadRequest("Leave not found");
+            if (leave.Status != "Pending") return BadRequest("Leave already processed");
 
             await _leaveSvc.ReviewAsync(
-                action.LeaveId,
-                action.ManagerId,
-                new ReviewLeaveDto
-                {
-                    Status = dto.Status,
-                    ReviewNote = "Reviewed via email"
-                });
+                action.LeaveId, action.ManagerId,
+                new ReviewLeaveDto { Status = dto.Status, ReviewNote = "Reviewed via email" });
 
             action.IsUsed = true;
             await _context.SaveChangesAsync();
@@ -103,16 +95,18 @@ namespace DailyTrackerAPI.Controllers
             return Ok(new { message = "Leave updated successfully" });
         }
 
+        // ── CHANGED: calls GetAnnualBalanceAsync ───────────────────────────────
         [HttpGet("balance")]
         public async Task<IActionResult> GetBalance()
         {
             var userId = User.GetUserId();
-            var role = User.FindFirst("role")?.Value;
+            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
+            // Manager sees all users; employee sees only themselves
             if (role == "Manager")
-                return Ok(await _leaveSvc.GetMonthlyBalanceAsync());
+                return Ok(await _leaveSvc.GetAnnualBalanceAsync());
 
-            return Ok(await _leaveSvc.GetMonthlyBalanceAsync(userId));
+            return Ok(await _leaveSvc.GetAnnualBalanceAsync(userId));
         }
     }
 }

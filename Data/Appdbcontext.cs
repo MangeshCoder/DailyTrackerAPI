@@ -56,6 +56,8 @@ namespace DailyTrackerAPI.Data
         public DbSet<MessageReadReceipt> MessageReadReceipts { get; set; }
         public DbSet<MessageReaction> MessageReactions { get; set; }
 
+        public DbSet<Announcement> Announcements { get; set; }
+        public DbSet<AnnouncementRead> AnnouncementReads { get; set; }
 
         protected override void OnModelCreating(ModelBuilder mb)
         {
@@ -323,6 +325,34 @@ namespace DailyTrackerAPI.Data
                  .WithMany(m => m.Reactions)
                  .HasForeignKey(r => r.MessageId)
                  .OnDelete(DeleteBehavior.Cascade);
+                e.HasOne(r => r.User)
+                 .WithMany()
+                 .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── Announcement
+            mb.Entity<Announcement>(e =>
+            {
+                e.HasOne(a => a.CreatedBy)
+                 .WithMany()
+                 .HasForeignKey(a => a.CreatedByUserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                e.Property(a => a.Title).HasMaxLength(200);
+                e.Property(a => a.Category).HasMaxLength(50);
+            });
+
+            // ── AnnouncementRead  (composite PK — one read-mark per user per post)
+            mb.Entity<AnnouncementRead>(e =>
+            {
+                e.HasKey(r => new { r.AnnouncementId, r.UserId });
+
+                e.HasOne(r => r.Announcement)
+                 .WithMany(a => a.Reads)
+                 .HasForeignKey(r => r.AnnouncementId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
                 e.HasOne(r => r.User)
                  .WithMany()
                  .HasForeignKey(r => r.UserId)

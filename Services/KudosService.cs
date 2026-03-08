@@ -5,14 +5,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Services
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Feature 9: Kudos Service
-    // ─────────────────────────────────────────────────────────────────────────
     public interface IKudosService
     {
         Task<KudosDto> GiveKudosAsync(int fromUserId, GiveKudosDto dto);
         Task<List<KudosDto>> GetRecentKudosAsync(int limit = 20);
         Task<KudosSummaryDto> GetUserKudosSummaryAsync(int userId);
+        Task<KudosLeaderboardDto> GetLeaderboardAsync(int year, int? month);
     }
 
     public class KudosService : IKudosService
@@ -32,8 +30,7 @@ namespace DailyTrackerAPI.Services
                 throw new InvalidOperationException("You cannot give kudos to yourself.");
 
             var toUser = await _db.Users.FindAsync(dto.ToUserId)
-                ?? throw new KeyNotFoundException("User not found.");
-
+                           ?? throw new KeyNotFoundException("User not found.");
             var fromUser = await _db.Users.FindAsync(fromUserId)!;
 
             var kudos = new Kudos
@@ -47,7 +44,6 @@ namespace DailyTrackerAPI.Services
             _db.Kudos.Add(kudos);
             await _db.SaveChangesAsync();
 
-            // Push real-time notification to recipient
             _db.Notifications.Add(new AppNotification
             {
                 UserId = dto.ToUserId,
@@ -97,7 +93,7 @@ namespace DailyTrackerAPI.Services
         public async Task<KudosSummaryDto> GetUserKudosSummaryAsync(int userId)
         {
             var user = await _db.Users.FindAsync(userId)
-                ?? throw new KeyNotFoundException("User not found.");
+                       ?? throw new KeyNotFoundException("User not found.");
 
             var received = await _db.Kudos
                 .Include(k => k.FromUser)
@@ -111,9 +107,12 @@ namespace DailyTrackerAPI.Services
                 User = new UserDto { Id = user.Id, FullName = user.FullName, Email = user.Email, Role = user.Role },
                 TotalReceived = received.Count,
                 TotalGiven = given,
-                BadgeCounts = received.GroupBy(k => k.BadgeType)
+                BadgeCounts = received
+                    .GroupBy(k => k.BadgeType)
                     .ToDictionary(g => g.Key, g => g.Count()),
-                RecentKudos = received.OrderByDescending(k => k.GivenAt).Take(5)
+                RecentKudos = received
+                    .OrderByDescending(k => k.GivenAt)
+                    .Take(5)
                     .Select(k => new KudosDto
                     {
                         Id = k.Id,
@@ -123,6 +122,72 @@ namespace DailyTrackerAPI.Services
                         BadgeType = k.BadgeType,
                         GivenAt = k.GivenAt
                     }).ToList()
+            };
+        }
+
+        // month = null  → full calendar year
+        // month = 1-12  → that specific month only
+        public async Task<KudosLeaderboardDto> GetLeaderboardAsync(int year, int? month)
+        {
+            DateTime from = month.HasValue
+                ? new DateTime(year, month.Value, 1)
+                : new DateTime(year, 1, 1);
+
+            DateTime to = month.HasValue
+                ? from.AddMonths(1)
+                : new DateTime(year + 1, 1, 1);
+
+            // Single query — load all kudos in window with recipient navigation
+            var kudosInPeriod = await _db.Kudos
+                .Include(k => k.ToUser)
+                .Where(k => k.GivenAt >= from && k.GivenAt < to)
+                .ToListAsync();
+
+            // Count how many kudos each person GAVE (for TotalGiven column)
+            var givenCounts = kudosInPeriod
+                .GroupBy(k => k.FromUserId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            // Group by recipient, compute badge breakdown and top badge
+            var entries = kudosInPeriod
+                .GroupBy(k => k.ToUserId)
+                .Select(g =>
+                {
+                    var badgeCounts = g
+                        .GroupBy(k => k.BadgeType)
+                        .ToDictionary(bg => bg.Key, bg => bg.Count());
+
+                    var topBadge = badgeCounts.Count > 0
+                        ? badgeCounts.OrderByDescending(kv => kv.Value).First().Key
+                        : string.Empty;
+
+                    return new KudosLeaderboardEntryDto
+                    {
+                        UserId = g.Key,
+                        UserName = g.First().ToUser.FullName,
+                        TotalReceived = g.Count(),
+                        TotalGiven = givenCounts.TryGetValue(g.Key, out var gv) ? gv : 0,
+                        BadgeCounts = badgeCounts,
+                        TopBadge = topBadge
+                    };
+                })
+                .OrderByDescending(e => e.TotalReceived)
+                .ToList();
+
+            // Assign rank after ordering
+            for (int i = 0; i < entries.Count; i++)
+                entries[i].Rank = i + 1;
+
+            string periodLabel = month.HasValue
+                ? $"{new DateTime(year, month.Value, 1):MMMM yyyy}"
+                : $"Full Year {year}";
+
+            return new KudosLeaderboardDto
+            {
+                Year = year,
+                Month = month,
+                PeriodLabel = periodLabel,
+                Entries = entries
             };
         }
     }
