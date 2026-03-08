@@ -33,6 +33,66 @@ namespace DailyTrackerAPI.DTOs
         public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
+        public string? Department { get; set; }
+        public string? Designation { get; set; }
+        public string? ProfilePhotoUrl { get; set; }
+
+    }
+
+    /// <summary>Full profile — returned by GET /api/profile and GET /api/directory/{id}</summary>
+    public class UserProfileDto
+    {
+        public int Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public string? Department { get; set; }
+        public string? Designation { get; set; }
+        public string? Phone { get; set; }
+        public string? Bio { get; set; }
+        public DateTime? JoinDate { get; set; }
+        public string? ProfilePhotoUrl { get; set; }
+        public DateTime CreatedAt { get; set; }
+        // Manager info (denormalized for convenience)
+        public int? ManagerId { get; set; }
+        public string? ManagerName { get; set; }
+    }
+
+    /// <summary>Fields the employee themselves can edit via PUT /api/profile</summary>
+    public class UpdateProfileDto
+    {
+        public string? FullName { get; set; }   // allow name correction
+        public string? Department { get; set; }
+        public string? Designation { get; set; }
+        public string? Phone { get; set; }
+        public string? Bio { get; set; }
+        public DateTime? JoinDate { get; set; }
+        // NOTE: ProfilePhotoUrl is set only via POST /api/profile/photo (file upload)
+        // NOTE: Role, Email, ManagerId, IsActive are NOT editable here (manager-only)
+    }
+
+    /// <summary>Lightweight card for the /team/directory grid</summary>
+    public class DirectoryUserDto
+    {
+        public int Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public string? Department { get; set; }
+        public string? Designation { get; set; }
+        public string? Phone { get; set; }
+        public string? ProfilePhotoUrl { get; set; }
+        public bool IsActive { get; set; }
+        public string? ManagerName { get; set; }
+    }
+
+    public class UpdateEmployeeProfileDto
+    {
+        public string? Department { get; set; }
+        public string? Designation { get; set; }
+        public DateTime? JoinDate { get; set; }
+        public int? ManagerId { get; set; }
     }
 
     // ─── Auth / Security ──────────────────────────────────────────────────────
@@ -234,6 +294,55 @@ namespace DailyTrackerAPI.DTOs
         public int TotalGiven { get; set; }
         public Dictionary<string, int> BadgeCounts { get; set; } = new();
         public List<KudosDto> RecentKudos { get; set; } = new();
+    }
+
+    public class KudosLeaderboardEntryDto
+    {
+        public int Rank { get; set; }         
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public int TotalReceived { get; set; }         
+        public int TotalGiven { get; set; }         
+        public Dictionary<string, int> BadgeCounts { get; set; } = new();
+        public string TopBadge { get; set; } = string.Empty;
+    }
+
+    public class KudosLeaderboardDto
+    {
+        public int Year { get; set; }
+        public int? Month { get; set; }         
+        public string PeriodLabel { get; set; } = string.Empty;
+        public List<KudosLeaderboardEntryDto> Entries { get; set; } = new();
+    }
+
+    // ─── Announcements ────────────────────────────────────────────────────────
+    public class CreateAnnouncementDto
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Content { get; set; } = string.Empty;
+        public string Category { get; set; } = "General";   // General | Policy | Event | Urgent
+        public bool IsPinned { get; set; } = false;
+        public DateTime? ExpiresAt { get; set; }
+    }
+
+    public class AnnouncementDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Content { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public bool IsPinned { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string CreatedByName { get; set; } = string.Empty;
+        public bool IsRead { get; set; }   // computed per requesting user
+    }
+
+    public class AnnouncementsResponseDto
+    {
+        public List<AnnouncementDto> Pinned { get; set; } = new();   // pinned first
+        public List<AnnouncementDto> Regular { get; set; } = new();   // rest
+        public int UnreadCount { get; set; }
     }
 
     // ─── Leave Management ─────────────────────────────────────────────────────
@@ -740,12 +849,31 @@ namespace DailyTrackerAPI.DTOs
         public string Status { get; set; }
     }
 
+    //public class LeaveBalanceDto
+    //{
+    //    public int UserId { get; set; }
+    //    public string UserName { get; set; } = "";
+    //    public int UsedDays { get; set; }
+    //    public int RemainingDays { get; set; }
+    //}
+
+    // One row per leave type (Casual, Sick, Earned, CompOff, Unpaid)
+    public class LeaveTypeBalanceItem
+    {
+        public string LeaveType { get; set; } = string.Empty;
+        public int Entitlement { get; set; }   // Annual cap; 0 = unlimited
+        public int Used { get; set; }          // Approved + Pending this year
+        public int Pending { get; set; }       // Subset of Used that are still Pending
+        public int Remaining { get; set; }     // Entitlement - Used (0 for unlimited types)
+        public bool IsUnlimited { get; set; }  // true for CompOff, Unpaid
+    }
+
     public class LeaveBalanceDto
     {
         public int UserId { get; set; }
-        public string UserName { get; set; } = "";
-        public int UsedDays { get; set; }
-        public int RemainingDays { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public int Year { get; set; }
+        public List<LeaveTypeBalanceItem> Balances { get; set; } = new();
     }
 
     public class CreateGroupDto
@@ -912,5 +1040,39 @@ namespace DailyTrackerAPI.DTOs
         public double ProductivityScore { get; set; }
         public string ScoreGrade { get; set; } = string.Empty; // A, B, C, D
         public bool GoalWasSet { get; set; }  // false = worked but no goal configured
+    }
+
+    /// <summary>One employee's status on one specific calendar day</summary>
+    public class CalendarMemberDayDto
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string? ProfilePhotoUrl { get; set; }
+        public string Role { get; set; } = string.Empty;
+        /// <summary>Present | WFH | HalfDay | Leave | Absent | Weekend | Unknown</summary>
+        public string Status { get; set; } = "Unknown";
+        /// <summary>Leave type when Status = Leave (Casual, Sick, etc.)</summary>
+        public string? LeaveType { get; set; }
+    }
+
+    /// <summary>All employees' status for one calendar day</summary>
+    public class CalendarDayDto
+    {
+        public string Date { get; set; } = string.Empty;  // yyyy-MM-dd
+        public string Weekday { get; set; } = string.Empty;  // Mon, Tue …
+        public bool IsWeekend { get; set; }
+        public bool IsHoliday { get; set; }
+        public string? HolidayName { get; set; }
+        public bool IsToday { get; set; }
+        public List<CalendarMemberDayDto> Members { get; set; } = new();
+    }
+
+    /// <summary>Full monthly calendar response</summary>
+    public class TeamCalendarResponseDto
+    {
+        public int Month { get; set; }
+        public int Year { get; set; }
+        public string Label { get; set; } = string.Empty;   // "June 2025"
+        public List<CalendarDayDto> Days { get; set; } = new();
     }
 }
