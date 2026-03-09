@@ -1076,6 +1076,7 @@ namespace DailyTrackerAPI.DTOs
         public List<CalendarDayDto> Days { get; set; } = new();
     }
 
+
     // ─── Meeting Log (Feature 6) ──────────────────────────────────────────────
 
     public class MeetingAttendeeDto
