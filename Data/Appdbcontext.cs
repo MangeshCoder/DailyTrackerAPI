@@ -58,6 +58,13 @@ namespace DailyTrackerAPI.Data
 
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<AnnouncementRead> AnnouncementReads { get; set; }
+        public DbSet<Meeting> Meetings { get; set; }
+        public DbSet<MeetingAttendee> MeetingAttendees { get; set; }
+        public DbSet<MeetingActionItem> MeetingActionItems { get; set; }
+        public DbSet<ReviewCycle> ReviewCycles { get; set; }
+        public DbSet<PerformanceReview> PerformanceReviews { get; set; }
+        public DbSet<ReviewRating> ReviewRatings { get; set; }
+        public DbSet<EmployeeSalary> EmployeeSalaries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder mb)
         {
@@ -356,6 +363,106 @@ namespace DailyTrackerAPI.Data
                 e.HasOne(r => r.User)
                  .WithMany()
                  .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── Meeting
+            mb.Entity<Meeting>(e =>
+            {
+                e.HasOne(m => m.OrganisedBy)
+                 .WithMany()
+                 .HasForeignKey(m => m.OrganisedByUserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── MeetingAttendee
+            mb.Entity<MeetingAttendee>(e =>
+            {
+                // One user can only appear once per meeting
+                e.HasIndex(a => new { a.MeetingId, a.UserId }).IsUnique();
+
+                e.HasOne(a => a.Meeting)
+                 .WithMany(m => m.Attendees)
+                 .HasForeignKey(a => a.MeetingId)
+                 .OnDelete(DeleteBehavior.Cascade);   // delete attendees when meeting deleted
+
+                e.HasOne(a => a.User)
+                 .WithMany()
+                 .HasForeignKey(a => a.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── MeetingActionItem
+            mb.Entity<MeetingActionItem>(e =>
+            {
+                e.HasOne(ai => ai.Meeting)
+                 .WithMany(m => m.ActionItems)
+                 .HasForeignKey(ai => ai.MeetingId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(ai => ai.AssignedTo)
+                 .WithMany()
+                 .HasForeignKey(ai => ai.AssignedToUserId)
+                 .OnDelete(DeleteBehavior.SetNull);   // keep action item if user deleted
+            });
+
+            // ── ReviewCycle
+            mb.Entity<ReviewCycle>(e =>
+            {
+                e.HasOne(rc => rc.CreatedBy)
+                 .WithMany()
+                 .HasForeignKey(rc => rc.CreatedByUserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── PerformanceReview
+            mb.Entity<PerformanceReview>(e =>
+            {
+                // One review per (cycle, employee) — no duplicates
+                e.HasIndex(r => new { r.ReviewCycleId, r.RevieweeId }).IsUnique();
+
+                e.HasOne(r => r.ReviewCycle)
+                 .WithMany(rc => rc.Reviews)
+                 .HasForeignKey(r => r.ReviewCycleId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(r => r.Reviewee)
+                 .WithMany()
+                 .HasForeignKey(r => r.RevieweeId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(r => r.Reviewer)
+                 .WithMany()
+                 .HasForeignKey(r => r.ReviewerId)
+                 .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ── ReviewRating
+            mb.Entity<ReviewRating>(e =>
+            {
+                // One score per competency per review
+                e.HasIndex(r => new { r.PerformanceReviewId, r.Competency }).IsUnique();
+
+                e.HasOne(r => r.PerformanceReview)
+                 .WithMany(pr => pr.Ratings)
+                 .HasForeignKey(r => r.PerformanceReviewId)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── EmployeeSalary
+            mb.Entity<EmployeeSalary>(e =>
+            {
+                // One salary record per employee
+                e.HasIndex(s => s.UserId).IsUnique();
+
+                e.HasOne(s => s.User)
+                 .WithMany()
+                 .HasForeignKey(s => s.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(s => s.SetBy)
+                 .WithMany()
+                 .HasForeignKey(s => s.SetByUserId)
                  .OnDelete(DeleteBehavior.Restrict);
             });
         }

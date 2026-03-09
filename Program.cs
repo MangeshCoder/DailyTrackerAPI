@@ -113,6 +113,8 @@ builder.Services.AddHttpClient<IAiService, GeminiService>();
 // Add after your existing service registrations:
 builder.Services.AddHostedService<NotificationSchedulerService>();
 builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
+builder.Services.AddScoped<IMeetingService, MeetingService>();
+builder.Services.AddScoped<IPerformanceReviewService, PerformanceReviewService>();
 
 builder.Services.AddHttpClient();
 
