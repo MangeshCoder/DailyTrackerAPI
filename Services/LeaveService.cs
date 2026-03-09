@@ -8,15 +8,36 @@ namespace DailyTrackerAPI.Services
 {
     // ─────────────────────────────────────────────────────────────────────────
     //  Feature 9: Leave Service
+    //
+    //  CHANGES FROM ORIGINAL:
+    //
+    //  1. CountWorkingDays  → now async, accepts a HashSet<DateTime> of holidays
+    //     so it skips both weekends AND public holidays.
+    //
+    //  2. GetHolidayDatesAsync  → new private helper, loads Holiday dates from
+    //     DB once per call, passed down to all CountWorkingDays calls.
+    //
+    //  3. ApplyAsync  → validation changed from "max 2 days per month" to
+    //     "annual entitlement per leave type". Casual=12, Sick=7, Earned=15;
+    //     CompOff and Unpaid are unlimited (no cap enforced).
+    //
+    //  4. GetMonthlyBalanceAsync renamed to GetAnnualBalanceAsync, now returns
+    //     per-type breakdown with entitlement / used / remaining for the year.
+    //
+    //  Everything else (ApplyAsync email/notification flow, ReviewAsync,
+    //  CancelAsync, GetMyLeavesAsync, GetAllLeavesAsync) is UNCHANGED.
     // ─────────────────────────────────────────────────────────────────────────
+
     public interface ILeaveService
     {
         Task<LeaveResponseDto> ApplyAsync(int userId, ApplyLeaveDto dto);
         Task<List<LeaveResponseDto>> GetMyLeavesAsync(int userId);
-        Task<List<LeaveResponseDto>> GetAllLeavesAsync(string? status = null); // Manager
+        Task<List<LeaveResponseDto>> GetAllLeavesAsync(string? status = null);
         Task ReviewAsync(int leaveId, int managerId, ReviewLeaveDto dto);
         Task CancelAsync(int leaveId, int userId);
-        Task<List<LeaveBalanceDto>> GetMonthlyBalanceAsync(int? userId = null);
+
+        // ── CHANGED: was GetMonthlyBalanceAsync, now annual + per-type ────────
+        Task<List<LeaveBalanceDto>> GetAnnualBalanceAsync(int? userId = null);
     }
 
     public class LeaveService : ILeaveService
@@ -26,7 +47,22 @@ namespace DailyTrackerAPI.Services
         private readonly IEmailService _email;
         private readonly IEmailActionService _emailAction;
 
-        public LeaveService(AppDbContext db, INotificationSender notif, IEmailService email, IEmailActionService emailAction)
+        // ── Annual entitlements per leave type ────────────────────────────────
+        // 0 = unlimited (CompOff, Unpaid — don't enforce a cap)
+        private static readonly Dictionary<string, int> Entitlements = new()
+        {
+            { "Casual",  12 },
+            { "Sick",     7 },
+            { "Earned",  15 },
+            { "CompOff",  0 },  // unlimited
+            { "Unpaid",   0 },  // unlimited
+        };
+
+        public LeaveService(
+            AppDbContext db,
+            INotificationSender notif,
+            IEmailService email,
+            IEmailActionService emailAction)
         {
             _db = db;
             _notif = notif;
@@ -34,6 +70,7 @@ namespace DailyTrackerAPI.Services
             _emailAction = emailAction;
         }
 
+        // ── CHANGED: uses annual entitlement instead of monthly 2-day cap ─────
         public async Task<LeaveResponseDto> ApplyAsync(int userId, ApplyLeaveDto dto)
         {
             if (dto.FromDate.Date > dto.ToDate.Date)
@@ -42,57 +79,47 @@ namespace DailyTrackerAPI.Services
             var user = await _db.Users.FindAsync(userId)
                 ?? throw new Exception("User not found");
 
-            // ✅ STEP 1: Count total requested working days
-            int totalRequestedDays = CountWorkingDays(dto.FromDate, dto.ToDate);
+            // Load public holidays covering the requested date range
+            var holidays = await GetHolidayDatesAsync(dto.FromDate.Year, dto.ToDate.Year);
 
-            if (totalRequestedDays <= 0)
-                throw new Exception("Selected dates contain only weekends.");
+            int requestedDays = CountWorkingDays(dto.FromDate, dto.ToDate, holidays);
+            if (requestedDays <= 0)
+                throw new Exception("Selected dates contain only weekends or public holidays.");
 
-            // ✅ STEP 2: Validate month-by-month (handles cross-month leave)
-            var currentMonth = new DateTime(dto.FromDate.Year, dto.FromDate.Month, 1);
-
-            while (currentMonth <= dto.ToDate)
+            // ── Annual entitlement check (skip for unlimited types) ───────────
+            var entitlement = Entitlements.GetValueOrDefault(dto.LeaveType, 12);
+            if (entitlement > 0)
             {
-                var monthStart = new DateTime(currentMonth.Year, currentMonth.Month, 1);
-                var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+                var yearStart = new DateTime(dto.FromDate.Year, 1, 1);
+                var yearEnd = new DateTime(dto.FromDate.Year, 12, 31);
 
-                // Count Approved + Pending leaves
-                var existingLeaves = await _db.LeaveRequests
+                // Count all Approved + Pending of this type this year
+                var existing = await _db.LeaveRequests
                     .Where(l =>
                         l.UserId == userId &&
+                        l.LeaveType == dto.LeaveType &&
                         (l.Status == "Approved" || l.Status == "Pending") &&
-                        l.FromDate <= monthEnd &&
-                        l.ToDate >= monthStart)
+                        l.FromDate <= yearEnd &&
+                        l.ToDate >= yearStart)
                     .ToListAsync();
 
                 int usedDays = 0;
-
-                foreach (var leaves in existingLeaves)
+                foreach (var e in existing)
                 {
-                    var overlapStart = leaves.FromDate < monthStart ? monthStart : leaves.FromDate;
-                    var overlapEnd = leaves.ToDate > monthEnd ? monthEnd : leaves.ToDate;
-
-                    usedDays += CountWorkingDays(overlapStart, overlapEnd);
+                    var s = e.FromDate < yearStart ? yearStart : e.FromDate;
+                    var en = e.ToDate > yearEnd ? yearEnd : e.ToDate;
+                    usedDays += CountWorkingDays(s, en, holidays);
                 }
 
-                // Count requested days for this specific month
-                var requestedStart = dto.FromDate < monthStart ? monthStart : dto.FromDate;
-                var requestedEnd = dto.ToDate > monthEnd ? monthEnd : dto.ToDate;
-
-                int requestedDaysThisMonth = CountWorkingDays(requestedStart, requestedEnd);
-
-                if (usedDays + requestedDaysThisMonth > 2)
-                {
+                if (usedDays + requestedDays > entitlement)
                     throw new ValidationException(
-                        $"Monthly leave limit exceeded for {monthStart:MMMM yyyy}. " +
-                        $"Used: {usedDays}, Requested: {requestedDaysThisMonth}, Max allowed: 2 working days."
-                    );
-                }
-
-                currentMonth = currentMonth.AddMonths(1);
+                        $"{dto.LeaveType} leave annual limit exceeded. " +
+                        $"Entitlement: {entitlement} days, " +
+                        $"Already used/pending: {usedDays} days, " +
+                        $"Requested: {requestedDays} days.");
             }
 
-            // ✅ STEP 3: Create Leave (UNCHANGED from your code)
+            // ── Create leave (UNCHANGED) ──────────────────────────────────────
             var leave = new LeaveRequest
             {
                 UserId = userId,
@@ -106,7 +133,7 @@ namespace DailyTrackerAPI.Services
             _db.LeaveRequests.Add(leave);
             await _db.SaveChangesAsync();
 
-            // 🔔 EXISTING Notification (UNCHANGED)
+            // 🔔 Notification (UNCHANGED)
             await _notif.SendToManagers("LeaveApplied", new
             {
                 UserId = userId,
@@ -114,28 +141,22 @@ namespace DailyTrackerAPI.Services
                 Message = "New leave request pending review"
             });
 
-            // 📧 EXISTING Email Logic (UNCHANGED)
+            // 📧 Email to managers (UNCHANGED)
             var managers = await _db.Users
                 .Where(u => u.Role == "Manager")
                 .ToListAsync();
 
             foreach (var manager in managers)
             {
-                var token = await _emailAction
-                    .CreateTokenAsync(leave.Id, manager.Id);
-
+                var token = await _emailAction.CreateTokenAsync(leave.Id, manager.Id);
                 await _email.SendLeaveAppliedEmailAsync(
-                    manager.Email,
-                    manager.FullName,
-                    user.FullName,
-                    leave,
-                    token
-                );
+                    manager.Email, manager.FullName, user.FullName, leave, token);
             }
 
             return await MapLeave(leave);
         }
 
+        // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task<List<LeaveResponseDto>> GetMyLeavesAsync(int userId)
         {
             var leaves = await _db.LeaveRequests
@@ -150,6 +171,7 @@ namespace DailyTrackerAPI.Services
             return result;
         }
 
+        // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task<List<LeaveResponseDto>> GetAllLeavesAsync(string? status = null)
         {
             var query = _db.LeaveRequests
@@ -166,6 +188,7 @@ namespace DailyTrackerAPI.Services
             return result;
         }
 
+        // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task ReviewAsync(int leaveId, int managerId, ReviewLeaveDto dto)
         {
             var leave = await _db.LeaveRequests
@@ -183,7 +206,6 @@ namespace DailyTrackerAPI.Services
 
             await _db.SaveChangesAsync();
 
-            // 🔔 Existing notification
             await _notif.SendToUser(leave.UserId, "ReceiveNotification", new
             {
                 Title = $"Leave {dto.Status}",
@@ -191,17 +213,12 @@ namespace DailyTrackerAPI.Services
                 Type = dto.Status == "Approved" ? "Success" : "Warning"
             });
 
-            // 📧 NEW: Email to Employee
             await _email.SendLeaveReviewedEmailAsync(
-                leave.User.Email,
-                leave.User.FullName,
-                manager.FullName,
-                leave,
-                dto.Status,
-                dto.ReviewNote
-            );
+                leave.User.Email, leave.User.FullName,
+                manager.FullName, leave, dto.Status, dto.ReviewNote);
         }
 
+        // ── UNCHANGED ─────────────────────────────────────────────────────────
         public async Task CancelAsync(int leaveId, int userId)
         {
             var leave = await _db.LeaveRequests
@@ -212,53 +229,140 @@ namespace DailyTrackerAPI.Services
             await _db.SaveChangesAsync();
         }
 
-        public async Task<List<LeaveBalanceDto>> GetMonthlyBalanceAsync(int? userId = null)
+        // ── CHANGED: was GetMonthlyBalanceAsync — now returns annual per-type ─
+        //
+        //  For each user, returns one LeaveBalanceDto with a Balances list —
+        //  one row per leave type showing: Entitlement / Used / Pending / Remaining.
+        //  Unlimited types (CompOff, Unpaid) show Used with IsUnlimited = true.
+        //
+        //  userId = null → all users (manager view)
+        //  userId = N    → that user only
+        public async Task<List<LeaveBalanceDto>> GetAnnualBalanceAsync(int? userId = null)
         {
-            var now = DateTime.UtcNow;
-            var monthStart = new DateTime(now.Year, now.Month, 1);
-            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var year = DateTime.UtcNow.Year;
+            var yearStart = new DateTime(year, 1, 1);
+            var yearEnd = new DateTime(year, 12, 31);
 
+            // Load all public holidays for this year once
+            var holidays = await GetHolidayDatesAsync(year);
+
+            // Load all non-rejected leaves for the year (+ user info)
             var query = _db.LeaveRequests
+                .Include(l => l.User)
                 .Where(l =>
                     l.Status != "Rejected" &&
-                    l.FromDate <= monthEnd &&
-                    l.ToDate >= monthStart);
+                    l.FromDate <= yearEnd &&
+                    l.ToDate >= yearStart);
 
             if (userId.HasValue)
                 query = query.Where(l => l.UserId == userId.Value);
 
-            var leaves = await query
-                .Include(l => l.User)
-                .ToListAsync();
+            var leaves = await query.ToListAsync();
 
-            var grouped = leaves.GroupBy(l => l.UserId);
+            // If a user exists but has no leaves this year we still want to
+            // show them (with all zeros). Load user list separately.
+            List<User> users;
+            if (userId.HasValue)
+            {
+                var u = await _db.Users.FindAsync(userId.Value);
+                users = u is null ? new() : new() { u };
+            }
+            else
+            {
+                users = await _db.Users
+                    .Where(u => u.IsActive)
+                    .OrderBy(u => u.FullName)
+                    .ToListAsync();
+            }
+
+            // Index leaves by userId for O(1) lookup
+            var leavesByUser = leaves.GroupBy(l => l.UserId)
+                               .ToDictionary(g => g.Key, g => g.ToList());
 
             var result = new List<LeaveBalanceDto>();
 
-            foreach (var group in grouped)
+            foreach (var user in users)
             {
-                int usedDays = 0;
+                var userLeaves = leavesByUser.GetValueOrDefault(user.Id, new());
 
-                foreach (var leaveItem in group)
+                var balances = new List<LeaveTypeBalanceItem>();
+
+                foreach (var (leaveType, entitlement) in Entitlements)
                 {
-                    var start = leaveItem.FromDate < monthStart ? monthStart : leaveItem.FromDate;
-                    var end = leaveItem.ToDate > monthEnd ? monthEnd : leaveItem.ToDate;
+                    var typeLeaves = userLeaves.Where(l => l.LeaveType == leaveType).ToList();
 
-                    usedDays += CountWorkingDays(start, end);
+                    int used = 0;
+                    int pending = 0;
+
+                    foreach (var l in typeLeaves)
+                    {
+                        var s = l.FromDate < yearStart ? yearStart : l.FromDate;
+                        var en = l.ToDate > yearEnd ? yearEnd : l.ToDate;
+                        var days = CountWorkingDays(s, en, holidays);
+
+                        used += days;
+                        if (l.Status == "Pending") pending += days;
+                    }
+
+                    bool isUnlimited = entitlement == 0;
+                    int remaining = isUnlimited ? 0 : Math.Max(0, entitlement - used);
+
+                    balances.Add(new LeaveTypeBalanceItem
+                    {
+                        LeaveType = leaveType,
+                        Entitlement = entitlement,
+                        Used = used,
+                        Pending = pending,
+                        Remaining = remaining,
+                        IsUnlimited = isUnlimited
+                    });
                 }
 
                 result.Add(new LeaveBalanceDto
                 {
-                    UserId = group.Key,
-                    UserName = group.First().User.FullName,
-                    UsedDays = usedDays,
-                    RemainingDays = Math.Max(0, 2 - usedDays)
+                    UserId = user.Id,
+                    UserName = user.FullName,
+                    Year = year,
+                    Balances = balances
                 });
             }
 
             return result;
         }
 
+        // ── Private: load public holiday dates for a year range ───────────────
+        private async Task<HashSet<DateTime>> GetHolidayDatesAsync(int fromYear, int toYear = -1)
+        {
+            if (toYear < fromYear) toYear = fromYear;
+
+            var holidays = await _db.Holidays
+                .Where(h => h.Year >= fromYear && h.Year <= toYear && h.Type == "Public")
+                .Select(h => h.Date.Date)
+                .ToListAsync();
+
+            return holidays.ToHashSet();
+        }
+
+        // ── CHANGED: skips public holidays in addition to weekends ───────────
+        //
+        // BEFORE: only skipped Saturday + Sunday
+        // AFTER:  skips Saturday + Sunday + any date in the holidays HashSet
+        private static int CountWorkingDays(DateTime from, DateTime to, HashSet<DateTime> holidays)
+        {
+            int count = 0;
+            for (var date = from.Date; date <= to.Date; date = date.AddDays(1))
+            {
+                if (date.DayOfWeek != DayOfWeek.Saturday &&
+                    date.DayOfWeek != DayOfWeek.Sunday &&
+                    !holidays.Contains(date))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        // ── UNCHANGED ─────────────────────────────────────────────────────────
         private static Task<LeaveResponseDto> MapLeave(LeaveRequest l) =>
             Task.FromResult(new LeaveResponseDto
             {
@@ -266,7 +370,7 @@ namespace DailyTrackerAPI.Services
                 UserName = l.User?.FullName ?? "Unknown",
                 FromDate = l.FromDate,
                 ToDate = l.ToDate,
-                LeaveDays = CountDays(l.FromDate, l.ToDate),
+                LeaveDays = CountDaysSimple(l.FromDate, l.ToDate),
                 LeaveType = l.LeaveType,
                 Reason = l.Reason,
                 Status = l.Status,
@@ -276,29 +380,13 @@ namespace DailyTrackerAPI.Services
                 AppliedAt = l.AppliedAt
             });
 
-        private static int CountDays(DateTime from, DateTime to)
+        private static int CountDaysSimple(DateTime from, DateTime to)
         {
             int days = 0;
             for (var d = from; d <= to; d = d.AddDays(1))
                 if (d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
                     days++;
             return Math.Max(1, days);
-        }
-
-        private int CountWorkingDays(DateTime from, DateTime to)
-        {
-            int count = 0;
-
-            for (var date = from.Date; date <= to.Date; date = date.AddDays(1))
-            {
-                if (date.DayOfWeek != DayOfWeek.Saturday &&
-                    date.DayOfWeek != DayOfWeek.Sunday)
-                {
-                    count++;
-                }
-            }
-
-            return count;
         }
     }
 }

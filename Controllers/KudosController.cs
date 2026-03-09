@@ -2,12 +2,10 @@
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DailyTrackerAPI.Controllers
 {
-    // ─── Kudos Controller ─────────────────────────────────────────────────────
     [ApiController, Route("api/kudos"), Authorize]
     public class KudosController : ControllerBase
     {
@@ -44,6 +42,27 @@ namespace DailyTrackerAPI.Controllers
         {
             var summary = await _kudosSvc.GetUserKudosSummaryAsync(userId);
             return Ok(summary);
+        }
+
+        // GET /api/kudos/leaderboard?period=week|month|alltime
+        [HttpGet("leaderboard")]
+        public async Task<IActionResult> GetLeaderboard([FromQuery] string period = "alltime")
+        {
+            var validPeriods = new[] { "week", "month", "alltime" };
+            if (!validPeriods.Contains(period))
+                return BadRequest(new { message = "period must be week, month, or alltime" });
+
+            var now = DateTime.UtcNow;
+            int year = now.Year;
+            int? month = period switch
+            {
+                "week" => now.Month,   // current month (closest backend equivalent)
+                "month" => now.Month,
+                _ => null         // alltime = full year, no month filter
+            };
+
+            var leaderboard = await _kudosSvc.GetLeaderboardAsync(year, month);
+            return Ok(leaderboard);
         }
     }
 }

@@ -11,6 +11,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 
 
@@ -33,6 +34,12 @@ builder.Services.AddMemoryCache();
 // ─── SignalR (Feature 1 - Real-time Notifications) ────────────────────────────
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationSender, SignalRNotificationSender>();
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    });
 
 // ─── Rate Limiting (Feature 11 - Security) ────────────────────────────────────
 builder.Services.AddRateLimiter(options =>
@@ -105,6 +112,9 @@ builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddHttpClient<IAiService, GeminiService>();
 // Add after your existing service registrations:
 builder.Services.AddHostedService<NotificationSchedulerService>();
+builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
+builder.Services.AddScoped<IMeetingService, MeetingService>();
+builder.Services.AddScoped<IPerformanceReviewService, PerformanceReviewService>();
 
 builder.Services.AddHttpClient();
 
