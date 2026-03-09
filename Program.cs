@@ -114,6 +114,9 @@ builder.Services.AddHttpClient<IAiService, GeminiService>();
 builder.Services.AddHostedService<NotificationSchedulerService>();
 builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 
+builder.Services.AddScoped<IMeetingService, MeetingService>();
+builder.Services.AddScoped<IPerformanceReviewService, PerformanceReviewService>();
+
 builder.Services.AddHttpClient();
 
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 55 * 1024 * 1024);
