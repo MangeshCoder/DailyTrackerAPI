@@ -1,4 +1,9 @@
-using DailyTrackerAPI.Models;
+using DailyTrackerAPI.Models.Attendance;
+using DailyTrackerAPI.Models.Auth;
+using DailyTrackerAPI.Models.Communication;
+using DailyTrackerAPI.Models.HR;
+using DailyTrackerAPI.Models.Performance;
+using DailyTrackerAPI.Models.Tasks;
 using Microsoft.EntityFrameworkCore;
 
 namespace DailyTrackerAPI.Data
