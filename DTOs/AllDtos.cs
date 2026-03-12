@@ -1480,4 +1480,358 @@ namespace DailyTrackerAPI.DTOs
         public int MembersNotConfigured { get; set; }  // no salary yet
         public List<PayslipDto> Members { get; set; } = new();
     }
+
+    // ─── Document Management ──────────────────────────────────────────────────
+
+    // ── Input DTOs ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Received as multipart/form-data because a file is attached.
+    /// The controller reads these fields with [FromForm].
+    /// </summary>
+    public class UploadDocumentDto
+    {
+        [Required, MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+
+        /// <summary>OfferLetter | Contract | Payslip | IDProof | Certificate | Policy | Appraisal | Warning | Other</summary>
+        public string Category { get; set; } = "Other";
+
+        /// <summary>
+        /// Which employee this document belongs to.
+        /// - Employee uploading their own doc: leave as 0 → backend fills their own userId.
+        /// - Manager uploading for an employee: pass the employee's userId.
+        /// </summary>
+        public int OwnerUserId { get; set; } = 0;
+
+        public bool IsPublic { get; set; } = false;
+        public DateTime? ExpiresAt { get; set; }
+    }
+
+    public class UpdateDocumentDto
+    {
+        public string? Title { get; set; }
+        public string? Description { get; set; }
+        public string? Category { get; set; }
+        public bool? IsPublic { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+    }
+
+    // ── Response DTOs ────────────────────────────────────────────────────────
+
+    public class DocumentDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string Category { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public string MimeType { get; set; } = string.Empty;
+        public long FileSizeBytes { get; set; }
+        public string FileSizeLabel { get; set; } = string.Empty;  // "2.4 MB"
+        public bool IsPublic { get; set; }
+        public DateTime UploadedAt { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public bool IsExpired { get; set; }
+        public bool ExpiresWithin30Days { get; set; }
+
+        // Owner info
+        public int OwnerUserId { get; set; }
+        public string OwnerName { get; set; } = string.Empty;
+
+        // Uploader info
+        public int UploadedByUserId { get; set; }
+        public string UploadedByName { get; set; } = string.Empty;
+
+        // Download URL
+        public string DownloadUrl { get; set; } = string.Empty; // /api/documents/{id}/download
+    }
+
+    public class DocumentSummaryDto
+    {
+        public int TotalDocuments { get; set; }
+        public int MyDocuments { get; set; }
+        public int PublicDocuments { get; set; }
+        public int ExpiringDocuments { get; set; }  // expiring within 30 days
+        public int ExpiredDocuments { get; set; }
+
+        // Counts by category
+        public Dictionary<string, int> ByCategory { get; set; } = new();
+    }
+
+    // ─── Training Input DTOs ──────────────────────────────────────────────────
+
+    public class CreateTrainingDto
+    {
+        [Required, MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(150)]
+        public string? Provider { get; set; }
+
+        /// <summary>Online | Internal | External | Conference | Workshop | Certification</summary>
+        public string TrainingType { get; set; } = "Online";
+
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+
+        [Required]
+        public DateTime StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+
+        public decimal DurationHours { get; set; } = 0;
+
+        /// <summary>Planned | InProgress | Completed | Cancelled</summary>
+        public string Status { get; set; } = "Planned";
+
+        [MaxLength(1000)]
+        public string? Notes { get; set; }
+
+        [MaxLength(500)]
+        public string? CourseUrl { get; set; }
+    }
+
+    public class UpdateTrainingDto
+    {
+        public string? Title { get; set; }
+        public string? Provider { get; set; }
+        public string? TrainingType { get; set; }
+        public string? Description { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public decimal? DurationHours { get; set; }
+        public string? Status { get; set; }
+        public string? Notes { get; set; }
+        public string? CourseUrl { get; set; }
+    }
+
+    // ─── Training Response DTOs ───────────────────────────────────────────────
+
+    public class TrainingDto
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string? Provider { get; set; }
+        public string TrainingType { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public decimal DurationHours { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+        public string? CourseUrl { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    // ─── Certification Input DTOs ─────────────────────────────────────────────
+    // Received as multipart/form-data (file is optional)
+
+    public class CreateCertificationDto
+    {
+        [Required, MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required, MaxLength(150)]
+        public string IssuingOrganization { get; set; } = string.Empty;
+
+        [Required]
+        public DateTime IssueDate { get; set; }
+
+        public DateTime? ExpiryDate { get; set; }
+
+        [MaxLength(100)]
+        public string? CredentialId { get; set; }
+
+        [MaxLength(500)]
+        public string? CredentialUrl { get; set; }
+    }
+
+    public class UpdateCertificationDto
+    {
+        public string? Name { get; set; }
+        public string? IssuingOrganization { get; set; }
+        public DateTime? IssueDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public string? CredentialId { get; set; }
+        public string? CredentialUrl { get; set; }
+        public string? Status { get; set; }
+    }
+
+    // ─── Certification Response DTOs ──────────────────────────────────────────
+
+    public class CertificationDto
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string IssuingOrganization { get; set; } = string.Empty;
+        public DateTime IssueDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public string? CredentialId { get; set; }
+        public string? CredentialUrl { get; set; }
+        public string Status { get; set; } = string.Empty;
+
+        // File info
+        public bool HasFile { get; set; }
+        public string? FileName { get; set; }
+        public string? FileSizeLabel { get; set; }
+        public string? DownloadUrl { get; set; }  // /api/training/certifications/{id}/download
+
+        // Computed
+        public bool IsExpired { get; set; }
+        public bool ExpiresWithin30Days { get; set; }
+        public int? DaysUntilExpiry { get; set; }  // null if no expiry
+        public DateTime CreatedAt { get; set; }
+    }
+
+    // ─── Summary / Stats DTOs ─────────────────────────────────────────────────
+
+    public class TrainingStatsDto
+    {
+        // Training stats
+        public int TotalTrainings { get; set; }
+        public int CompletedTrainings { get; set; }
+        public int PlannedTrainings { get; set; }
+        public int InProgressTrainings { get; set; }
+        public decimal TotalHours { get; set; }
+
+        // Certification stats
+        public int TotalCertifications { get; set; }
+        public int ActiveCertifications { get; set; }
+        public int ExpiredCertifications { get; set; }
+        public int ExpiringWithin30Days { get; set; }
+
+        // Breakdown by training type
+        public Dictionary<string, int> ByTrainingType { get; set; } = new();
+    }
+
+    public class TeamTrainingStatsDto
+    {
+        public int TotalMembers { get; set; }
+        public int TotalTrainings { get; set; }
+        public int TotalCertifications { get; set; }
+        public int ExpiringCerts { get; set; }
+        public decimal TotalHours { get; set; }
+
+        public List<MemberTrainingSummaryDto> Members { get; set; } = new();
+    }
+
+    public class MemberTrainingSummaryDto
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public int TrainingCount { get; set; }
+        public int CompletedCount { get; set; }
+        public decimal HoursCompleted { get; set; }
+        public int CertificationCount { get; set; }
+        public int ExpiringCertCount { get; set; }
+    }
+
+    // Swagger-safe wrapper — avoids duplicate "Name" key collision between
+    // CreateCertificationDto.Name and IFormFile.Name when flattening form params
+    public class CreateCertFormRequest
+    {
+        [Required] public string Name { get; set; } = string.Empty;
+        [Required] public string IssuingOrganization { get; set; } = string.Empty;
+        [Required] public DateTime IssueDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public string? CredentialId { get; set; }
+        public string? CredentialUrl { get; set; }
+        public IFormFile? File { get; set; }  // named "File" not "Name"
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Resignation & Exit Management DTOs
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // ─── Input ────────────────────────────────────────────────────────────────
+
+    public class SubmitResignationDto
+    {
+        [Required, MaxLength(1000)]
+        public string Reason { get; set; } = string.Empty;
+
+        [Required]
+        public DateTime RequestedLastDay { get; set; }
+    }
+
+    public class ReviewResignationDto
+    {
+        /// <summary>Accepted | Rejected</summary>
+        [Required]
+        public string Decision { get; set; } = string.Empty;
+
+        [MaxLength(1000)]
+        public string? ReviewNote { get; set; }
+
+        /// <summary>Official last day (required when Decision = Accepted)</summary>
+        public DateTime? NoticePeriodEndDate { get; set; }
+    }
+
+    public class CompleteExitDto
+    {
+        public DateTime ExitDate { get; set; }
+
+        [MaxLength(1000)]
+        public string? FinalNote { get; set; }
+    }
+
+    // ─── Checklist input ──────────────────────────────────────────────────────
+
+    public class AddChecklistItemDto
+    {
+        [Required, MaxLength(200)]
+        public string Task { get; set; } = string.Empty;
+    }
+
+    // ─── Response ─────────────────────────────────────────────────────────────
+
+    public class ExitChecklistItemDto
+    {
+        public int Id { get; set; }
+        public string Task { get; set; } = string.Empty;
+        public bool IsCompleted { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public string? CompletedByName { get; set; }
+    }
+
+    public class ResignationDto
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public string? Department { get; set; }
+        public string? Designation { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public DateTime RequestedLastDay { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? ReviewNote { get; set; }
+        public string? ReviewedByName { get; set; }
+        public DateTime? ReviewedAt { get; set; }
+        public DateTime? NoticePeriodEndDate { get; set; }
+        public DateTime? ExitDate { get; set; }
+        public DateTime SubmittedAt { get; set; }
+
+        // Computed helpers for UI
+        public int? NoticeDaysRemaining { get; set; }  // null if not accepted yet
+        public bool IsMyResignation { get; set; }  // true if current user owns it
+
+        public List<ExitChecklistItemDto> ChecklistItems { get; set; } = new();
+    }
+
+    public class ResignationSummaryDto
+    {
+        public int PendingCount { get; set; }
+        public int AcceptedCount { get; set; }
+        public int CompletedCount { get; set; }
+        public int RejectedCount { get; set; }
+        public List<ResignationDto> Active { get; set; } = new(); // Pending + Accepted
+    }
 }

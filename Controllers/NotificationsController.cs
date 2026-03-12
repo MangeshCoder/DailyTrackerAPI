@@ -40,5 +40,39 @@ namespace DailyTrackerAPI.Controllers
             await _notifSvc.MarkAllReadAsync(User.GetUserId());
             return Ok();
         }
+
+        /// <summary>
+        /// Full paged inbox — skip/take with no hard limit.
+        /// Used by the dedicated Notifications inbox page.
+        /// The bell popup continues using the existing GET /api/notifications
+        /// (which keeps Take(50) — fast and sufficient for the popup).
+        /// </summary>
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetPaged(
+            [FromQuery] int skip = 0,
+            [FromQuery] int take = 30,
+            [FromQuery] bool unreadOnly = false)
+        {
+            // Cap take at 100 to prevent abuse
+            take = Math.Min(take, 100);
+            var list = await _notifSvc.GetPagedAsync(User.GetUserId(), skip, take, unreadOnly);
+            return Ok(list);
+        }
+
+        // ── Delete a single notification ──────────────────────────────────────
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var deleted = await _notifSvc.DeleteAsync(id, User.GetUserId());
+            return deleted ? NoContent() : NotFound(new { message = "Notification not found." });
+        }
+
+        // ── Delete all read notifications (inbox clear-up) ────────────────────
+        [HttpDelete("clear-read")]
+        public async Task<IActionResult> ClearRead()
+        {
+            var count = await _notifSvc.DeleteAllReadAsync(User.GetUserId());
+            return Ok(new { deleted = count, message = $"{count} read notification{(count == 1 ? "" : "s")} cleared." });
+        }
     }
 }
