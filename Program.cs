@@ -85,8 +85,6 @@ builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ISupportService, SupportService>();
 builder.Services.AddScoped<IMediaStorageService, MediaStorageService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
-builder.Services.AddScoped<IManagerService, ManagerService>();
-builder.Services.AddScoped<IReportService, ReportService>();
 
 // ─── NEW SERVICES (Manager + Reports) ────────────────────────────────────────
 builder.Services.AddScoped<IManagerService, ManagerService>();
@@ -116,6 +114,9 @@ builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 
 builder.Services.AddScoped<IMeetingService, MeetingService>();
 builder.Services.AddScoped<IPerformanceReviewService, PerformanceReviewService>();
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<ITrainingService, TrainingService>();
+builder.Services.AddScoped<IResignationService, ResignationService>();
 
 builder.Services.AddHttpClient();
 
@@ -209,6 +210,12 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+    // ← ADD THIS — fixes IFormFile schema generation
+    c.MapType<IFormFile>(() => new Microsoft.OpenApi.Models.OpenApiSchema
+    {
+        Type = "string",
+        Format = "binary"
+    });
 });
 
 var app = builder.Build();
@@ -221,6 +228,8 @@ app.UseExceptionHandler(errorApp =>
         var exception = context.Features
             .Get<IExceptionHandlerFeature>()?
             .Error;
+
+        Console.WriteLine("SWAGGER ERROR: " + exception?.ToString());
 
         if (exception is ValidationException)
         {

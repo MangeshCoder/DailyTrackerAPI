@@ -66,6 +66,11 @@ namespace DailyTrackerAPI.Data
         public DbSet<PerformanceReview> PerformanceReviews { get; set; }
         public DbSet<ReviewRating> ReviewRatings { get; set; }
         public DbSet<EmployeeSalary> EmployeeSalaries { get; set; }
+        public DbSet<Document> Documents { get; set; }
+        public DbSet<Training> Trainings { get; set; }
+        public DbSet<Certification> Certifications { get; set; }
+        public DbSet<Resignation> Resignations { get; set; }
+        public DbSet<ExitChecklistItem> ExitChecklistItems { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder mb)
@@ -468,6 +473,85 @@ namespace DailyTrackerAPI.Data
                  .OnDelete(DeleteBehavior.Restrict);
             });
 
+            // ── Document
+            mb.Entity<Document>(e =>
+            {
+                // Employee who owns the document
+                e.HasOne(d => d.OwnerUser)
+                 .WithMany()
+                 .HasForeignKey(d => d.OwnerUserId)
+                 .OnDelete(DeleteBehavior.Cascade);   // delete docs when employee deleted
+
+                // Person who uploaded it (could be a manager)
+                e.HasOne(d => d.UploadedBy)
+                 .WithMany()
+                 .HasForeignKey(d => d.UploadedByUserId)
+                 .OnDelete(DeleteBehavior.NoAction);  // keep doc if uploader is deleted
+
+                // Index for fast "get all docs for employee X" queries
+                e.HasIndex(d => d.OwnerUserId);
+
+                // Index for category filtering
+                e.HasIndex(d => d.Category);
+            });
+
+            // ── Training
+            mb.Entity<Training>(e =>
+            {
+                e.HasOne(t => t.User)
+                 .WithMany()
+                 .HasForeignKey(t => t.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(t => t.UserId);
+                e.HasIndex(t => t.Status);
+                e.Property(t => t.DurationHours).HasColumnType("decimal(6,2)");
+            });
+
+            // ── Certification
+            mb.Entity<Certification>(e =>
+            {
+                e.HasOne(c => c.User)
+                 .WithMany()
+                 .HasForeignKey(c => c.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(c => c.UserId);
+                e.HasIndex(c => c.ExpiryDate);   // for fast expiry queries
+            });
+
+            // ── Resignation
+            mb.Entity<Resignation>(e =>
+            {
+                e.HasOne(r => r.User)
+                 .WithMany()
+                 .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);   // keep record even if user deactivated
+
+                e.HasOne(r => r.ReviewedBy)
+                 .WithMany()
+                 .HasForeignKey(r => r.ReviewedByUserId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                e.HasIndex(r => r.UserId);
+                e.HasIndex(r => r.Status);
+            });
+
+            // ── ExitChecklistItem
+            mb.Entity<ExitChecklistItem>(e =>
+            {
+                e.HasOne(c => c.Resignation)
+                 .WithMany(r => r.ChecklistItems)
+                 .HasForeignKey(c => c.ResignationId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(c => c.CompletedBy)
+                 .WithMany()
+                 .HasForeignKey(c => c.CompletedByUserId)
+                 .IsRequired(false)
+                 .OnDelete(DeleteBehavior.NoAction);
+            });
         }
     }
 }

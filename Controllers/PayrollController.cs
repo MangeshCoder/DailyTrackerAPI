@@ -16,7 +16,7 @@ namespace DailyTrackerAPI.Controllers
     //  PAYROLL FORMULA:
     //    PerDayRate     = MonthlySalary / WorkingDaysInMonth
     //    HourlyRate     = MonthlySalary / (WorkingDaysInMonth × 8)
-    //    BasicEarnings  = (DaysPresent + DaysHalfDay×0.5 + DaysPaidLeave) × PerDayRate
+    //    BasicEarnings = MonthlySalary (full monthly salary, deductions applied separately)
     //    OvertimePay    = (OvertimeMinutes / 60) × HourlyRate × OvertimeMultiplier
     //    GrossEarnings  = BasicEarnings + OvertimePay
     //    Deductions     = (DaysUnpaidLeave + DaysAbsent) × PerDayRate
