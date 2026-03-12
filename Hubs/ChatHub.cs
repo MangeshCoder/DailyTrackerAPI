@@ -1,5 +1,5 @@
 ﻿using DailyTrackerAPI.Helpers;
-using DailyTrackerAPI.Services;
+using DailyTrackerAPI.Services.Communication;
 using DocumentFormat.OpenXml.InkML;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.AspNetCore.Authorization;
