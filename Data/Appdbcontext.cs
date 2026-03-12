@@ -63,6 +63,7 @@ namespace DailyTrackerAPI.Data
 
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<AnnouncementRead> AnnouncementReads { get; set; }
+
         public DbSet<Meeting> Meetings { get; set; }
         public DbSet<MeetingAttendee> MeetingAttendees { get; set; }
         public DbSet<MeetingActionItem> MeetingActionItems { get; set; }
@@ -75,6 +76,7 @@ namespace DailyTrackerAPI.Data
         public DbSet<Certification> Certifications { get; set; }
         public DbSet<Resignation> Resignations { get; set; }
         public DbSet<ExitChecklistItem> ExitChecklistItems { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder mb)
         {
