@@ -20,7 +20,7 @@ namespace DailyTrackerAPI.Controllers
 
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Manager")]
+    [Authorize(Roles = "Manager,TeamLead")]
     public class ManagerController : ControllerBase
     {
         private readonly IManagerService _managerService;

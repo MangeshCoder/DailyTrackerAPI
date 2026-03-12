@@ -4,6 +4,7 @@ using DailyTrackerAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DailyTrackerAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260310171059_adddocumentmodel")]
+    partial class adddocumentmodel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -193,76 +196,6 @@ namespace DailyTrackerAPI.Migrations
                     b.HasIndex("DailyLogId");
 
                     b.ToTable("BreakLogs");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.Certification", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CredentialId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("CredentialUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime?>("ExpiryDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("FileName")
-                        .HasMaxLength(260)
-                        .HasColumnType("nvarchar(260)");
-
-                    b.Property<string>("FilePath")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<long?>("FileSizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("IssueDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("IssuingOrganization")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("MimeType")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiryDate");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Certifications");
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.ChatMessage", b =>
@@ -697,40 +630,6 @@ namespace DailyTrackerAPI.Migrations
                         .IsUnique();
 
                     b.ToTable("EmployeeSalaries");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.ExitChecklistItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CompletedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsCompleted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("ResignationId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Task")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompletedByUserId");
-
-                    b.HasIndex("ResignationId");
-
-                    b.ToTable("ExitChecklistItems");
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.Holiday", b =>
@@ -1308,63 +1207,6 @@ namespace DailyTrackerAPI.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
-            modelBuilder.Entity("DailyTrackerAPI.Models.Resignation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("ExitDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("NoticePeriodEndDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime>("RequestedLastDay")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ReviewNote")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ReviewedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime>("SubmittedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReviewedByUserId");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Resignations");
-                });
-
             modelBuilder.Entity("DailyTrackerAPI.Models.ReviewCycle", b =>
                 {
                     b.Property<int>("Id")
@@ -1616,72 +1458,6 @@ namespace DailyTrackerAPI.Migrations
                     b.HasIndex("TaskLogId");
 
                     b.ToTable("TaskTimers");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.Training", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CourseUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<decimal>("DurationHours")
-                        .HasColumnType("decimal(6,2)");
-
-                    b.Property<DateTime?>("EndDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Provider")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("TrainingType")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Status");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Trainings");
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.TrustedDevice", b =>
@@ -2000,17 +1776,6 @@ namespace DailyTrackerAPI.Migrations
                     b.Navigation("DailyLog");
                 });
 
-            modelBuilder.Entity("DailyTrackerAPI.Models.Certification", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("DailyTrackerAPI.Models.ChatMessage", b =>
                 {
                     b.HasOne("DailyTrackerAPI.Models.Conversation", "Conversation")
@@ -2143,24 +1908,6 @@ namespace DailyTrackerAPI.Migrations
                     b.Navigation("SetBy");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.ExitChecklistItem", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.User", "CompletedBy")
-                        .WithMany()
-                        .HasForeignKey("CompletedByUserId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("DailyTrackerAPI.Models.Resignation", "Resignation")
-                        .WithMany("ChecklistItems")
-                        .HasForeignKey("ResignationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CompletedBy");
-
-                    b.Navigation("Resignation");
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.Kudos", b =>
@@ -2372,24 +2119,6 @@ namespace DailyTrackerAPI.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DailyTrackerAPI.Models.Resignation", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.User", "ReviewedBy")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByUserId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("DailyTrackerAPI.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ReviewedBy");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("DailyTrackerAPI.Models.ReviewCycle", b =>
                 {
                     b.HasOne("DailyTrackerAPI.Models.User", "CreatedBy")
@@ -2462,17 +2191,6 @@ namespace DailyTrackerAPI.Migrations
                         .IsRequired();
 
                     b.Navigation("TaskLog");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.Training", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.TrustedDevice", b =>
@@ -2581,11 +2299,6 @@ namespace DailyTrackerAPI.Migrations
             modelBuilder.Entity("DailyTrackerAPI.Models.PerformanceReview", b =>
                 {
                     b.Navigation("Ratings");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.Resignation", b =>
-                {
-                    b.Navigation("ChecklistItems");
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.ReviewCycle", b =>

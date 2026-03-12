@@ -27,6 +27,9 @@ namespace DailyTrackerAPI.Services
         // Calling CreateAsync in a loop = N separate DB round-trips.
         // This method does one AddRange + one SaveChangesAsync for all users.
         Task CreateForUsersAsync(IEnumerable<int> userIds, string title, string message, string type = "Reminder", string? actionUrl = null);
+        Task<List<NotificationDto>> GetPagedAsync(int userId, int skip, int take, bool unreadOnly = false);
+        Task<bool> DeleteAsync(int notifId, int userId);
+        Task<int> DeleteAllReadAsync(int userId);
     }
 
     public class AppNotificationService : IAppNotificationService
@@ -74,6 +77,46 @@ namespace DailyTrackerAPI.Services
                 .Where(n => n.UserId == userId && !n.IsRead)
                 .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true));
         }
+
+        public async Task<List<NotificationDto>> GetPagedAsync(
+            int userId, int skip, int take, bool unreadOnly = false)
+        {
+            var query = _db.Notifications.Where(n => n.UserId == userId);
+            if (unreadOnly) query = query.Where(n => !n.IsRead);
+
+            return await query
+                .OrderByDescending(n => n.CreatedAt)
+                .Skip(skip)
+                .Take(take)
+                .Select(n => new NotificationDto
+                {
+                    Id = n.Id,
+                    Title = n.Title,
+                    Message = n.Message,
+                    Type = n.Type,
+                    ActionUrl = n.ActionUrl,
+                    IsRead = n.IsRead,
+                    CreatedAt = n.CreatedAt,
+                })
+                .ToListAsync();
+        }
+
+        public async Task<bool> DeleteAsync(int notifId, int userId)
+        {
+            var n = await _db.Notifications
+                .FirstOrDefaultAsync(n => n.Id == notifId && n.UserId == userId);
+            if (n == null) return false;
+            _db.Notifications.Remove(n);
+            await _db.SaveChangesAsync();
+            return true;
+        }
+
+        // Single SQL  DELETE WHERE IsRead = 1 AND UserId = @userId
+        // ExecuteDeleteAsync = no entity load, no loop, one round-trip
+        public async Task<int> DeleteAllReadAsync(int userId) =>
+            await _db.Notifications
+                .Where(n => n.UserId == userId && n.IsRead)
+                .ExecuteDeleteAsync();
 
         public Task<int> GetUnreadCountAsync(int userId) =>
             _db.Notifications.CountAsync(n => n.UserId == userId && !n.IsRead);
