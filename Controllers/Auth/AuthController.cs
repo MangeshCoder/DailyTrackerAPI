@@ -440,21 +440,50 @@ namespace DailyTrackerAPI.Controllers.Auth
             return Ok(users);
         }
 
+        //private void SetAuthCookies(AuthResponseV2Dto tokens)
+        //{
+        //    var accessOptions = new CookieOptions
+        //    {
+        //        HttpOnly = true,
+        //        Secure = HttpContext.Request.IsHttps, // auto detect
+        //        SameSite = SameSiteMode.None, // ⭐ required for localhost cross-origin
+        //        Expires = DateTime.UtcNow.AddMinutes(15)
+        //    };
+
+        //    var refreshOptions = new CookieOptions
+        //    {
+        //        HttpOnly = true,
+        //        Secure = HttpContext.Request.IsHttps,
+        //        SameSite = SameSiteMode.None,
+        //        Expires = DateTime.UtcNow.AddDays(7)
+        //    };
+
+        //    Response.Cookies.Append("accessToken", tokens.AccessToken, accessOptions);
+        //    Response.Cookies.Append("refreshToken", tokens.RefreshToken, refreshOptions);
+        //}
+
         private void SetAuthCookies(AuthResponseV2Dto tokens)
         {
+            var isHttps = HttpContext.Request.IsHttps;
+
+            // SameSite=None REQUIRES Secure=true (browser spec)
+            // Over HTTP (mobile local testing): use SameSite=Lax instead
+            // 192.168.1.244:5053 → 192.168.1.244:3000 = same host = Lax works fine
+            var sameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax;
+
             var accessOptions = new CookieOptions
             {
                 HttpOnly = true,
-                Secure = HttpContext.Request.IsHttps, // auto detect
-                SameSite = SameSiteMode.None, // ⭐ required for localhost cross-origin
+                Secure = isHttps,
+                SameSite = sameSite,
                 Expires = DateTime.UtcNow.AddMinutes(15)
             };
 
             var refreshOptions = new CookieOptions
             {
                 HttpOnly = true,
-                Secure = HttpContext.Request.IsHttps,
-                SameSite = SameSiteMode.None,
+                Secure = isHttps,
+                SameSite = sameSite,
                 Expires = DateTime.UtcNow.AddDays(7)
             };
 

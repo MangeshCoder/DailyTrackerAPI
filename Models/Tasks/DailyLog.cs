@@ -27,6 +27,13 @@ namespace DailyTrackerAPI.Models.Tasks
         public string? Notes { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        // ── Check-in location (nullable — old records won't have these) ───────
+        public double? CheckInLatitude { get; set; }
+        public double? CheckInLongitude { get; set; }
+
+        // ── Check-out location (nullable) ─────────────────────────────────────
+        public double? CheckOutLatitude { get; set; }
+        public double? CheckOutLongitude { get; set; }
 
         // Navigation
         public ICollection<BreakLog> BreakLogs { get; set; } = new List<BreakLog>();

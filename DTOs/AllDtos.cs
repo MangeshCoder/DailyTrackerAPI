@@ -479,11 +479,16 @@ namespace DailyTrackerAPI.DTOs
     {
         public string DayStatus { get; set; } = "Present"; // Present, WFH, HalfDay
         public string? Notes { get; set; }
+        // GPS coordinates from browser — required for location check
+        [Required] public double Latitude { get; set; }
+        [Required] public double Longitude { get; set; }
     }
 
     public class CheckOutDto
     {
         public string? Notes { get; set; }
+        [Required] public double Latitude { get; set; }
+        [Required] public double Longitude { get; set; }
     }
 
     public class DailyLogResponseDto
@@ -566,6 +571,11 @@ namespace DailyTrackerAPI.DTOs
         public string? Resolution { get; set; }
         public int TimeSpentMinutes { get; set; } = 0;
         public string SupportType { get; set; } = "Technical";
+
+        // GPS coordinates sent from the browser
+        // Required — backend WILL reject if missing (location check is mandatory)
+        [Required] public double Latitude { get; set; }
+        [Required] public double Longitude { get; set; }
     }
 
     public class SupportLogResponseDto
@@ -578,6 +588,11 @@ namespace DailyTrackerAPI.DTOs
         public string SupportType { get; set; } = string.Empty;
         public DateTime SupportedAt { get; set; }
         public List<MediaEvidenceDto> Media { get; set; } = new();
+
+        // Location info — shown to managers in audit view
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public double? DistanceFromOfficeMetres { get; set; }
     }
 
     public class MediaEvidenceDto

@@ -70,7 +70,10 @@ if (app.Environment.IsDevelopment())
 }
 
 // ─── Middleware Pipeline ──────────────────────────────────────────────────────
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseStaticFiles();       // Serve wwwroot/uploads/*
 app.UseCors("AllowReact");
 app.UseAuthentication();

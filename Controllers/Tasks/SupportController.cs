@@ -1,3 +1,16 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  FILE 6:  backend/Controllers/SupportController.cs
+//  ACTION:  REPLACE entire file
+//
+//  Changes from original:
+//  1. Both endpoints now accept latitude + longitude from the form
+//  2. Both catch LocationException → return 403 with the exact error message
+//     (403 Forbidden is the correct HTTP status — user is authenticated but
+//      not permitted to submit from their current location)
+//  3. The [FromForm] parameter list in CreateSupportWithMedia now includes
+//     latitude and longitude
+// ─────────────────────────────────────────────────────────────────────────────
+
 using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
@@ -7,7 +20,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace DailyTrackerAPI.Controllers.Tasks
+namespace DailyTrackerAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
@@ -18,26 +31,51 @@ namespace DailyTrackerAPI.Controllers.Tasks
         private readonly IMediaStorageService _mediaStorage;
         private readonly AppDbContext _db;
 
-        public SupportController(ISupportService supportService, IMediaStorageService mediaStorage, AppDbContext db)
+        public SupportController(
+            ISupportService supportService,
+            IMediaStorageService mediaStorage,
+            AppDbContext db)
         {
             _supportService = supportService;
             _mediaStorage = mediaStorage;
             _db = db;
         }
 
-        /// <summary>Create support log (JSON body, no media).</summary>
+        /// <summary>
+        /// Create support log (JSON body, no media).
+        /// Latitude + Longitude are required — backend validates location.
+        /// </summary>
         [HttpPost]
         public async Task<IActionResult> CreateSupport([FromBody] CreateSupportDto dto)
         {
-            var result = await _supportService.CreateSupportAsync(User.GetUserId(), dto);
-            if (result == null) return BadRequest(new { message = "Check in first or developer not found." });
-            return Ok(result);
+            try
+            {
+                var result = await _supportService.CreateSupportAsync(User.GetUserId(), dto);
+                if (result == null)
+                    return BadRequest(new { message = "Check in first or developer not found." });
+                return Ok(result);
+            }
+            catch (LocationException ex)
+            {
+                // 403 = authenticated but not permitted from this location
+                return StatusCode(403, new { message = ex.Message });
+            }
         }
 
-        /// <summary>Create support log with screenshots/recordings as proof. Use multipart/form-data.</summary>
+        /// <summary>
+        /// Create support log WITH media evidence (multipart/form-data).
+        /// latitude + longitude fields are required in the form.
+        /// </summary>
         [HttpPost("with-media")]
-        public async Task<IActionResult> CreateSupportWithMedia([FromForm] int supportedDeveloperId, [FromForm] string issueDescription,
-            [FromForm] string? resolution, [FromForm] int timeSpentMinutes, [FromForm] string supportType, [FromForm] IFormFileCollection? files)
+        public async Task<IActionResult> CreateSupportWithMedia(
+            [FromForm] int supportedDeveloperId,
+            [FromForm] string issueDescription,
+            [FromForm] string? resolution,
+            [FromForm] int timeSpentMinutes,
+            [FromForm] string supportType,
+            [FromForm] double latitude,      // ← NEW
+            [FromForm] double longitude,     // ← NEW
+            [FromForm] IFormFileCollection? files)
         {
             var dto = new CreateSupportDto
             {
@@ -45,16 +83,29 @@ namespace DailyTrackerAPI.Controllers.Tasks
                 IssueDescription = issueDescription,
                 Resolution = resolution,
                 TimeSpentMinutes = timeSpentMinutes,
-                SupportType = supportType ?? "Technical"
+                SupportType = supportType ?? "Technical",
+                Latitude = latitude,
+                Longitude = longitude
             };
 
             IFormFileCollection? fileCollection = null;
-            if (Request.Form.Files != null && Request.Form.Files.Count > 0)
+            if (Request.Form.Files is { Count: > 0 })
                 fileCollection = Request.Form.Files;
 
-            var result = await _supportService.CreateSupportWithMediaAsync(User.GetUserId(), dto, fileCollection);
-            if (result == null) return BadRequest(new { message = "Check in first or developer not found." });
-            return Ok(result);
+            try
+            {
+                var result = await _supportService.CreateSupportWithMediaAsync(
+                    User.GetUserId(), dto, fileCollection);
+
+                if (result == null)
+                    return BadRequest(new { message = "Check in first or developer not found." });
+
+                return Ok(result);
+            }
+            catch (LocationException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
         }
 
         [HttpDelete("{supportId}")]
@@ -71,10 +122,7 @@ namespace DailyTrackerAPI.Controllers.Tasks
             return Ok(result);
         }
 
-        /// <summary>
-        /// Secured media stream. User sees own media only; Manager sees all.
-        /// Requires Bearer token.
-        /// </summary>
+        /// <summary>Secured media stream. Own media only; Manager sees all.</summary>
         [HttpGet("media/{mediaId:int}")]
         public async Task<IActionResult> GetMedia(int mediaId)
         {
@@ -89,13 +137,12 @@ namespace DailyTrackerAPI.Controllers.Tasks
             if (evidence?.SupportLog?.DailyLog == null)
                 return NotFound();
 
-            var supportLogOwnerId = evidence.SupportLog!.DailyLog!.UserId;
-            if (!isManager && userId != supportLogOwnerId)
+            var ownerId = evidence.SupportLog!.DailyLog!.UserId;
+            if (!isManager && userId != ownerId)
                 return Forbid();
 
             var fileInfo = await _mediaStorage.GetMediaFileInfoAsync(mediaId);
-            if (fileInfo == null)
-                return NotFound();
+            if (fileInfo == null) return NotFound();
 
             var (fullPath, mimeType, fileName) = fileInfo.Value;
             return PhysicalFile(fullPath, mimeType, fileName, enableRangeProcessing: true);
