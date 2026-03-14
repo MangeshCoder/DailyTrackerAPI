@@ -24,6 +24,9 @@ namespace DailyTrackerAPI.Models.Tasks
         public string SupportType { get; set; } = "Technical"; // Technical, CodeReview, Debugging, Deployment
 
         public DateTime SupportedAt { get; set; } = DateTime.UtcNow;
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public double? DistanceFromOfficeMetres { get; set; }
 
         public ICollection<MediaEvidence> MediaEvidences { get; set; } = new List<MediaEvidence>();
     }

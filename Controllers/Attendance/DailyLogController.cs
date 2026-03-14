@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using DailyTrackerAPI.DTOs;
+﻿using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Services.Attendance;
+using DailyTrackerAPI.Services.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace DailyTrackerAPI.Controllers.Attendance
 {
@@ -18,73 +19,56 @@ namespace DailyTrackerAPI.Controllers.Attendance
             _logService = logService;
         }
 
-        /// <summary>
-        /// User daily check-in
-        /// </summary>
-        /// <param name="dto"></param>
-        /// <returns></returns>
         [HttpPost("checkin")]
         public async Task<IActionResult> CheckIn([FromBody] CheckInDto dto)
         {
-            var userId = User.GetUserId();
-            var result = await _logService.CheckInAsync(userId, dto);
-            if (result == null)
-                return BadRequest(new { message = "Already checked in today." });
-
-            return Ok(result);
+            try
+            {
+                var result = await _logService.CheckInAsync(User.GetUserId(), dto);
+                if (result == null)
+                    return BadRequest(new { message = "Already checked in today." });
+                return Ok(result);
+            }
+            catch (LocationException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
         }
 
-        /// <summary>
-        /// User daily check-out
-        /// </summary>
-        /// <param name="dto"></param>
-        /// <returns></returns>
         [HttpPut("checkout")]
         public async Task<IActionResult> CheckOut([FromBody] CheckOutDto dto)
         {
-            var userId = User.GetUserId();
-            var result = await _logService.CheckOutAsync(userId, dto);
-            if (result == null)
-                return BadRequest(new { message = "No check-in found for today." });
-
-            return Ok(result);
+            try
+            {
+                var result = await _logService.CheckOutAsync(User.GetUserId(), dto);
+                if (result == null)
+                    return BadRequest(new { message = "No check-in found for today." });
+                return Ok(result);
+            }
+            catch (LocationException ex)
+            {
+                return StatusCode(403, new { message = ex.Message });
+            }
         }
 
-        /// <summary>
-        /// Get user daily check-in check-out record
-        /// </summary>
-        /// <returns></returns>
         [HttpGet("today")]
         public async Task<IActionResult> GetToday()
         {
-            var userId = User.GetUserId();
-            var result = await _logService.GetTodayLogAsync(userId);
+            var result = await _logService.GetTodayLogAsync(User.GetUserId());
             return result == null ? NotFound() : Ok(result);
         }
 
-        /// <summary>
-        /// Get user check-in check-out record by date 
-        /// </summary>
-        /// <param name="date"></param>
-        /// <returns></returns>
         [HttpGet("date/{date}")]
         public async Task<IActionResult> GetByDate(DateTime date)
         {
-            var userId = User.GetUserId();
-            var result = await _logService.GetLogByDateAsync(userId, date);
+            var result = await _logService.GetLogByDateAsync(User.GetUserId(), date);
             return result == null ? NotFound() : Ok(result);
         }
 
-        /// <summary>
-        /// Get user check-in check-out history
-        /// </summary>
-        /// <param name="days"></param>
-        /// <returns></returns>
         [HttpGet("history")]
         public async Task<IActionResult> GetHistory([FromQuery] int days = 30)
         {
-            var userId = User.GetUserId();
-            var result = await _logService.GetHistoryAsync(userId, days);
+            var result = await _logService.GetHistoryAsync(User.GetUserId(), days);
             return Ok(result);
         }
     }

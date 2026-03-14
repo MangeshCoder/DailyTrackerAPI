@@ -1,6 +1,7 @@
 ﻿using DailyTrackerAPI.Data;
 using DailyTrackerAPI.Helpers;
 using DailyTrackerAPI.Hubs;
+using DailyTrackerAPI.Services;
 using DailyTrackerAPI.Services.AI;
 using DailyTrackerAPI.Services.Attendance;
 using DailyTrackerAPI.Services.Auth;
@@ -81,6 +82,7 @@ namespace DailyTrackerAPI.Extensions
 
             // ── Background Jobs ───────────────────────────────────────────────
             services.AddHostedService<NotificationSchedulerService>();
+            services.AddScoped<ILocationService, LocationService>();
 
             return services;
         }
@@ -143,7 +145,10 @@ namespace DailyTrackerAPI.Extensions
         {
             services.AddCors(options =>
                 options.AddPolicy("AllowReact", policy =>
-                    policy.WithOrigins("http://localhost:3000")
+                    policy.WithOrigins(
+                        "http://localhost:3000",
+                        "http://192.168.1.244:3000"
+                        )
                           .AllowAnyHeader()
                           .AllowAnyMethod()
                           .AllowCredentials()
