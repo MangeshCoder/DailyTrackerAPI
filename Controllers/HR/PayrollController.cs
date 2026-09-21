@@ -128,6 +128,70 @@ namespace DailyTrackerAPI.Controllers.HR
             });
         }
 
+        /// <summary>
+        /// Manager report: who came in on weekends and holidays this month.
+        /// GET /api/payroll/weekend-holiday-report?month=X&year=Y
+        /// </summary>
+        [HttpGet("weekend-holiday-report"), Authorize(Roles = "Manager,TeamLead")]
+        public async Task<IActionResult> GetWeekendHolidayReport(
+            [FromQuery] int? month, [FromQuery] int? year)
+        {
+            var now = DateTime.UtcNow;
+            var m = month ?? now.Month;
+            var y = year ?? now.Year;
+
+            var from = new DateTime(y, m, 1);
+            var to = from.AddMonths(1).AddDays(-1);
+
+            // Get all weekend/holiday logs for the month
+            var logs = await _db.DailyLogs
+                .Include(d => d.User)
+                .Where(d =>
+                    d.LogDate >= from &&
+                    d.LogDate <= to &&
+                    (d.DayStatus == "Weekend" || d.DayStatus == "Holiday"))
+                .OrderBy(d => d.LogDate)
+                .ToListAsync();
+
+            // Get holidays for name lookup
+            var holidays = await _db.Holidays
+                .Where(h => h.Date >= from && h.Date <= to)
+                .ToListAsync();
+
+            var entries = logs.Select(l =>
+            {
+                var holidayName = l.DayStatus == "Holiday"
+                    ? holidays.FirstOrDefault(h => h.Date.Date == l.LogDate.Date)?.Name
+                    : null;
+
+                return new WeekendHolidayAttendanceDto
+                {
+                    UserId = l.UserId,
+                    FullName = l.User.FullName,
+                    Role = l.User.Role,
+                    Date = l.LogDate,
+                    DayStatus = l.DayStatus,
+                    DayOfWeek = l.LogDate.DayOfWeek.ToString(),
+                    HolidayName = holidayName,
+                    CheckInTime = l.CheckInTime,
+                    CheckOutTime = l.CheckOutTime,
+                    WorkMinutes = l.TotalWorkMinutes,
+                    WorkHours = FormatMinutes(l.TotalWorkMinutes),
+                };
+            }).ToList();
+
+            return Ok(new
+            {
+                Month = m,
+                Year = y,
+                MonthLabel = from.ToString("MMMM yyyy"),
+                TotalEntries = entries.Count,
+                WeekendEntries = entries.Count(e => e.DayStatus == "Weekend"),
+                HolidayEntries = entries.Count(e => e.DayStatus == "Holiday"),
+                Entries = entries,
+            });
+        }
+
         // ── GET /api/payroll/salary/team ──────────────────────────────────────
         [HttpGet("salary/team"), Authorize(Roles = "Manager,TeamLead")]
         public async Task<IActionResult> GetTeamSalaries()
@@ -242,8 +306,11 @@ namespace DailyTrackerAPI.Controllers.HR
                 .ToListAsync();
 
             // ── Attendance breakdown ───────────────────────────────────────
-            int daysPresent = logs.Count(l => l.DayStatus is "Present" or "WFH");
+            int daysPresent = logs.Count(l =>
+                l.DayStatus is "Present" or "WFH" or "Weekend" or "Holiday");
             int daysHalfDay = logs.Count(l => l.DayStatus == "HalfDay");
+            int daysWeekend = logs.Count(l => l.DayStatus == "Weekend");
+            int daysHoliday = logs.Count(l => l.DayStatus == "Holiday");
 
             // Leave days that fall within this month
             int daysPaidLeave = 0;
@@ -366,6 +433,8 @@ namespace DailyTrackerAPI.Controllers.HR
                 HourlyRate = Math.Round(hourlyRate, 2),
                 DaysPresent = daysPresent,
                 DaysHalfDay = daysHalfDay,
+                DaysWeekend = daysWeekend,
+                DaysHoliday = daysHoliday,
                 DaysPaidLeave = daysPaidLeave,
                 DaysUnpaidLeave = daysUnpaidLeave,
                 DaysAbsent = daysAbsent,

@@ -1,17 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  FILE 3: backend/Services/Dailylogservice.cs
+//  FEATURE 1 — FILE 1
+//  backend/Services/Dailylogservice.cs
 //  ACTION: REPLACE entire file
 //
-//  Key changes:
-//  1. ILocationService injected
-//  2. CheckInAsync — location logic:
-//       Step A: Check if employee has approved WFH for today
-//               YES → skip location check, set DayStatus = "WFH"
-//               NO  → run location check, throw LocationException if outside
-//  3. CheckOutAsync — same logic:
-//       WFH approved → skip location check
-//       No WFH       → location check mandatory
-//  4. Both store coordinates in the DailyLog record
+//  Change: CheckInAsync now detects weekend/holiday and sets DayStatus
+//  accordingly instead of blocking. Same location logic applies.
+//  Weekend  → DayStatus = "Weekend"
+//  Holiday  → DayStatus = "Holiday"
+//  Normal   → DayStatus = "Present" (or WFH if approved)
 // ─────────────────────────────────────────────────────────────────────────────
 
 using DailyTrackerAPI.Data;
@@ -47,31 +43,32 @@ namespace DailyTrackerAPI.Services.Attendance
         {
             var today = DateTime.UtcNow.Date;
 
-            // Already checked in today — return existing log
             var existing = await _db.DailyLogs
                 .FirstOrDefaultAsync(d => d.UserId == userId && d.LogDate == today);
             if (existing != null) return await MapToDtoAsync(existing.Id);
 
-            // ── STEP 1: Check for approved WFH request for today ──────────────
-            //
-            // If approved WFH exists → employee is working from home legitimately
-            // → skip location check entirely
-            // → set DayStatus to "WFH" automatically
-            //
+            // ── STEP 1: Detect weekend ────────────────────────────────────────
+            var isWeekend = today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+
+            // ── STEP 2: Detect public holiday ─────────────────────────────────
+            var holiday = await _db.Holidays
+                .FirstOrDefaultAsync(h => h.Date.Date == today);
+            var isHoliday = holiday != null;
+
+            // ── STEP 3: Check for approved WFH ───────────────────────────────
             var approvedWFH = await _db.WFHRequests
                 .FirstOrDefaultAsync(r =>
                     r.UserId == userId &&
                     r.RequestDate.Date == today &&
                     r.Status == "Approved" &&
                     r.RequestType == "WFH");
-
             var isWFH = approvedWFH != null;
 
-            // ── STEP 2: Location check (only if NOT on approved WFH) ──────────
-            if (!isWFH)
+            // ── STEP 4: Location check ────────────────────────────────────────
+            // Skip for WFH, Weekend, Holiday — they can check in from anywhere
+            if (!isWFH && !isWeekend && !isHoliday)
             {
                 var distance = _location.GetDistanceFromOffice(dto.Latitude, dto.Longitude);
-
                 if (!_location.IsWithinOffice(dto.Latitude, dto.Longitude))
                 {
                     throw new LocationException(
@@ -83,22 +80,28 @@ namespace DailyTrackerAPI.Services.Attendance
                 }
             }
 
-            // ── STEP 3: Create the daily log ──────────────────────────────────
+            // ── STEP 5: Determine DayStatus ───────────────────────────────────
+            string dayStatus;
+            if (isWFH) dayStatus = "WFH";
+            else if (isHoliday) dayStatus = "Holiday";
+            else if (isWeekend) dayStatus = "Weekend";
+            else dayStatus = "Present";
+
+            // ── STEP 6: Create log ────────────────────────────────────────────
             var log = new DailyLog
             {
                 UserId = userId,
                 LogDate = today,
                 CheckInTime = DateTime.UtcNow,
-                DayStatus = isWFH ? "WFH" : "Present",
+                DayStatus = dayStatus,
                 Notes = dto.Notes,
-                CheckInLatitude = isWFH ? null : dto.Latitude,
-                CheckInLongitude = isWFH ? null : dto.Longitude,
+                CheckInLatitude = (isWFH || isWeekend || isHoliday) ? null : dto.Latitude,
+                CheckInLongitude = (isWFH || isWeekend || isHoliday) ? null : dto.Longitude,
             };
 
             _db.DailyLogs.Add(log);
             await _db.SaveChangesAsync();
 
-            // Link WFH request to this daily log
             if (approvedWFH != null)
             {
                 approvedWFH.DailyLogId = log.Id;
@@ -117,19 +120,12 @@ namespace DailyTrackerAPI.Services.Attendance
 
             if (log == null || log.CheckInTime == null) return null;
 
-            // ── STEP 1: Check for approved WFH ───────────────────────────────
-            var isWFH = await _db.WFHRequests
-                .AnyAsync(r =>
-                    r.UserId == userId &&
-                    r.RequestDate.Date == today &&
-                    r.Status == "Approved" &&
-                    r.RequestType == "WFH");
+            // Skip location check for WFH, Weekend, Holiday
+            var skipLocation = log.DayStatus is "WFH" or "Weekend" or "Holiday";
 
-            // ── STEP 2: Location check (only if NOT on approved WFH) ─────────
-            if (!isWFH)
+            if (!skipLocation)
             {
                 var distance = _location.GetDistanceFromOffice(dto.Latitude, dto.Longitude);
-
                 if (!_location.IsWithinOffice(dto.Latitude, dto.Longitude))
                 {
                     throw new LocationException(
@@ -138,13 +134,10 @@ namespace DailyTrackerAPI.Services.Attendance
                         $"Your current distance: {distance:0}m."
                     );
                 }
-
-                // Store check-out coordinates
                 log.CheckOutLatitude = dto.Latitude;
                 log.CheckOutLongitude = dto.Longitude;
             }
 
-            // ── STEP 3: End active break if any ──────────────────────────────
             var activeBreak = log.BreakLogs.FirstOrDefault(b => b.IsActive);
             if (activeBreak != null)
             {
@@ -153,7 +146,6 @@ namespace DailyTrackerAPI.Services.Attendance
                 activeBreak.IsActive = false;
             }
 
-            // ── STEP 4: Calculate work time ───────────────────────────────────
             log.CheckOutTime = DateTime.UtcNow;
             log.TotalBreakMinutes = log.BreakLogs.Sum(b => b.DurationMinutes);
             var totalElapsed = (int)(log.CheckOutTime.Value - log.CheckInTime.Value).TotalMinutes;
@@ -200,11 +192,11 @@ namespace DailyTrackerAPI.Services.Attendance
                 .Include(d => d.BreakLogs)
                 .Include(d => d.TaskLogs)
                 .Include(d => d.SupportLogs).ThenInclude(s => s.SupportedDeveloper)
+                .Include(d => d.SupportLogs).ThenInclude(s => s.SupportEngineer)
                 .Include(d => d.SupportLogs).ThenInclude(s => s.MediaEvidences)
                 .FirstAsync(d => d.Id == logId);
 
             var workMins = log.TotalWorkMinutes;
-
             if (log.CheckInTime != null && log.CheckOutTime == null)
             {
                 var elapsed = (int)(DateTime.UtcNow - log.CheckInTime.Value).TotalMinutes;
@@ -253,6 +245,7 @@ namespace DailyTrackerAPI.Services.Attendance
                 SupportLogs = log.SupportLogs.Select(s => new SupportLogResponseDto
                 {
                     Id = s.Id,
+                    SupportEngineerName = s.SupportEngineer?.FullName ?? "",
                     SupportedDeveloperName = s.SupportedDeveloper.FullName,
                     IssueDescription = s.IssueDescription,
                     Resolution = s.Resolution,
