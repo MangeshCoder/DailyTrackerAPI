@@ -1,6 +1,7 @@
 using DailyTrackerAPI.Data;
 using DailyTrackerAPI.DTOs;
 using DailyTrackerAPI.Models.Auth;
+using DailyTrackerAPI.Models.HR;
 using DailyTrackerAPI.Models.Tasks;
 using Microsoft.EntityFrameworkCore;
 
@@ -58,6 +59,7 @@ namespace DailyTrackerAPI.Services.Team
         }
 
         // ─── User Monthly Attendance ──────────────────────────────────────────
+        // FIX: now counts Weekend and Holiday logs separately
 
         public async Task<UserAttendanceSummaryDto> GetUserMonthlyAttendanceAsync(int userId, int month, int year)
         {
@@ -77,7 +79,12 @@ namespace DailyTrackerAPI.Services.Team
             int present = logs.Count(l => l.DayStatus == "Present");
             int wfh = logs.Count(l => l.DayStatus == "WFH");
             int halfDay = logs.Count(l => l.DayStatus == "HalfDay");
+            int weekend = logs.Count(l => l.DayStatus == "Weekend");  // ← FIX
+            int holiday = logs.Count(l => l.DayStatus == "Holiday");  // ← FIX
+
+            // totalLogged = regular working days only (for attendance % calculation)
             int totalLogged = present + wfh + halfDay;
+            // absent = working days not covered by any regular attendance
             int absent = Math.Max(0, workingDays - totalLogged);
 
             int totalWork = logs.Sum(l => l.TotalWorkMinutes);
@@ -94,6 +101,8 @@ namespace DailyTrackerAPI.Services.Team
                 DaysWFH = wfh,
                 DaysHalfDay = halfDay,
                 DaysAbsent = absent,
+                DaysWeekend = weekend,  // ← FIX
+                DaysHoliday = holiday,  // ← FIX
                 AttendancePercentage = workingDays > 0
                     ? Math.Round((double)totalLogged / workingDays * 100, 1) : 0,
                 TotalWorkMinutes = totalWork,
@@ -190,28 +199,39 @@ namespace DailyTrackerAPI.Services.Team
         }
 
         // ─── Attendance Calendar ──────────────────────────────────────────────
+        // FIX: Removed the `continue` that skipped log lookup for weekend days.
+        // Now checks for an actual DailyLog FIRST for every day including weekends.
+        // If a log exists → show its real DayStatus + CheckIn/Out data.
+        // If no log on weekend → show "Weekend" (no check-in).
+        // If no log on holiday → show "Holiday" (holiday name in CheckIn for tooltip).
 
         public async Task<List<AttendanceDayDto>> GetUserAttendanceCalendarAsync(int userId, int month, int year)
         {
             var from = new DateTime(year, month, 1);
             var to = from.AddMonths(1).AddDays(-1);
 
+            // Load all logs for the month into a fast dictionary
             var logs = await _db.DailyLogs
                 .Include(d => d.TaskLogs)
                 .Where(d => d.UserId == userId && d.LogDate >= from && d.LogDate <= to)
                 .ToDictionaryAsync(d => d.LogDate.Date);
 
+            // Load holidays for the month for tooltip labels
+            var holidays = await _db.Holidays
+                .Where(h => h.Date >= from && h.Date <= to)
+                .ToDictionaryAsync(h => h.Date.Date);
+
             var result = new List<AttendanceDayDto>();
+
             for (var day = from; day <= to; day = day.AddDays(1))
             {
-                if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-                {
-                    result.Add(new AttendanceDayDto { Date = day, Status = "Weekend" });
-                    continue;
-                }
+                bool isWeekend = day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+                holidays.TryGetValue(day.Date, out var holiday);
 
                 if (logs.TryGetValue(day.Date, out var log))
                 {
+                    // Employee checked in — use their real DayStatus regardless of day type
+                    // DayStatus will be "Weekend", "Holiday", "Present", "WFH", etc.
                     result.Add(new AttendanceDayDto
                     {
                         Date = day,
@@ -222,8 +242,24 @@ namespace DailyTrackerAPI.Services.Team
                         TasksCompleted = log.TaskLogs.Count(t => t.Status == "Completed")
                     });
                 }
+                else if (isWeekend)
+                {
+                    // Saturday or Sunday, no check-in
+                    result.Add(new AttendanceDayDto { Date = day, Status = "Weekend" });
+                }
+                else if (holiday != null)
+                {
+                    // Public holiday, no check-in — store holiday name for tooltip
+                    result.Add(new AttendanceDayDto
+                    {
+                        Date = day,
+                        Status = "Holiday",
+                        CheckIn = holiday.Name   // used as tooltip label in frontend
+                    });
+                }
                 else
                 {
+                    // Normal working day, no log
                     result.Add(new AttendanceDayDto
                     {
                         Date = day,
@@ -240,12 +276,10 @@ namespace DailyTrackerAPI.Services.Team
             var user = await _db.Users.FindAsync(userId)
                 ?? throw new KeyNotFoundException("User not found");
 
-            // Prevent manager from disabling themselves
             if (user.Role == "Manager")
                 throw new Exception("Managers cannot be deactivated.");
 
             user.IsActive = !user.IsActive;
-
             await _db.SaveChangesAsync();
 
             return new
@@ -255,9 +289,7 @@ namespace DailyTrackerAPI.Services.Team
                 user.Email,
                 user.Role,
                 user.IsActive,
-                message = user.IsActive
-                    ? "User activated successfully."
-                    : "User deactivated successfully."
+                message = user.IsActive ? "User activated successfully." : "User deactivated successfully."
             };
         }
 
@@ -280,13 +312,7 @@ namespace DailyTrackerAPI.Services.Team
         private static UserDailyActivityDto BuildUserDailyActivity(User user, DailyLog? log)
         {
             if (log == null)
-            {
-                return new UserDailyActivityDto
-                {
-                    User = MapUserDto(user),
-                    DayStatus = "Absent"
-                };
-            }
+                return new UserDailyActivityDto { User = MapUserDto(user), DayStatus = "Absent" };
 
             var activeBreak = log.BreakLogs.FirstOrDefault(b => b.IsActive);
             int workMins = log.TotalWorkMinutes;

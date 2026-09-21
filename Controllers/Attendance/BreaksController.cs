@@ -15,6 +15,7 @@ namespace DailyTrackerAPI.Controllers.Attendance
         private readonly IBreakService _breakService;
         public BreaksController(IBreakService breakService) { _breakService = breakService; }
 
+        #region POST StartBreak
         /// <summary>
         /// Start break time 
         /// </summary>
@@ -26,8 +27,10 @@ namespace DailyTrackerAPI.Controllers.Attendance
             var result = await _breakService.StartBreakAsync(User.GetUserId(), dto);
             if (result == null) return BadRequest(new { message = "Please check in first." });
             return Ok(result);
-        }
+        } 
+        #endregion
 
+        #region PUT EndBreak
         /// <summary>
         /// End break time
         /// </summary>
@@ -39,8 +42,10 @@ namespace DailyTrackerAPI.Controllers.Attendance
             var result = await _breakService.EndBreakAsync(User.GetUserId(), breakId);
             if (result == null) return NotFound();
             return Ok(result);
-        }
+        } 
+        #endregion
 
+        #region GET GetTodayBreaks
         /// <summary>
         /// Get today all breaks 
         /// </summary>
@@ -50,6 +55,7 @@ namespace DailyTrackerAPI.Controllers.Attendance
         {
             var result = await _breakService.GetTodayBreaksAsync(User.GetUserId());
             return Ok(result);
-        }
+        } 
+        #endregion
     }
 }

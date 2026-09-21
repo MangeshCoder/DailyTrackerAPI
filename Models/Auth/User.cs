@@ -36,9 +36,13 @@ namespace DailyTrackerAPI.Models.Auth
         public string? Bio { get; set; }                 
         [MaxLength(500)]
         public string? ProfilePhotoUrl { get; set; }    
-        public DateTime? JoinDate { get; set; }         
+        public DateTime? JoinDate { get; set; }
+        // Face recognition fields  
+        public string? FaceDescriptor { get; set; }
+        public bool FaceRegistered { get; set; } = false;
         // Navigation
         public ICollection<DailyLog> DailyLogs { get; set; } = new List<DailyLog>();
         public ICollection<SupportLog> SupportGiven { get; set; } = new List<SupportLog>();
+        public ICollection<SupportLog> SupportLogsAsEngineer { get; set; } = new List<SupportLog>();
     }
 }

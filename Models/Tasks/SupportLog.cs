@@ -10,6 +10,11 @@ namespace DailyTrackerAPI.Models.Tasks
         public int DailyLogId { get; set; }
         public DailyLog DailyLog { get; set; } = null!;
 
+        // ── Who gave the support (Feature 2) ─────────────────────────────────
+        public int SupportEngineerId { get; set; }
+        public User SupportEngineer { get; set; } = null!;
+
+        // ── Who received the support ──────────────────────────────────────────
         public int SupportedDeveloperId { get; set; }
         public User SupportedDeveloper { get; set; } = null!;
 
@@ -21,9 +26,15 @@ namespace DailyTrackerAPI.Models.Tasks
 
         public int TimeSpentMinutes { get; set; } = 0;
 
-        public string SupportType { get; set; } = "Technical"; // Technical, CodeReview, Debugging, Deployment
+        public string SupportType { get; set; } = "Technical";
 
         public DateTime SupportedAt { get; set; } = DateTime.UtcNow;
+
+        // ── Linked assignment (Feature 3 — nullable, set when created under assignment) ──
+        public int? SupportAssignmentId { get; set; }
+        public SupportAssignment? SupportAssignment { get; set; }
+
+        // ── Location (existing) ───────────────────────────────────────────────
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
         public double? DistanceFromOfficeMetres { get; set; }
