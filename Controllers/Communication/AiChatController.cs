@@ -81,9 +81,23 @@ namespace DailyTrackerAPI.Controllers.Communication
                     var priority = request.Payload.TryGetValue("priority", out var prioObj) ? prioObj?.ToString() : "Medium";
                     var minutes = request.Payload.TryGetValue("timeSpentMinutes", out var minObj) && int.TryParse(minObj?.ToString(), out var m) ? m : 30;
 
+                    var today = DateTime.Today;
+                    var dailyLog = _db.DailyLogs.FirstOrDefault(l => l.UserId == userId && l.LogDate == today);
+                    if (dailyLog == null)
+                    {
+                        dailyLog = new DailyLog
+                        {
+                            UserId = userId,
+                            LogDate = today,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _db.DailyLogs.Add(dailyLog);
+                        await _db.SaveChangesAsync();
+                    }
+
                     var task = new TaskLog
                     {
-                        Id = userId,
+                        DailyLogId = dailyLog.Id,
                         TaskTitle = taskTitle ?? "AI Task",
                         Priority = priority ?? "Medium",
                         Status = "InProgress",
@@ -103,12 +117,11 @@ namespace DailyTrackerAPI.Controllers.Communication
                     var reason = request.Payload.TryGetValue("reason", out var rObj) ? rObj?.ToString() : "Requested via AI Copilot";
                     var wfh = new WFHRequest
                     {
-                        Id = userId,
+                        UserId = userId,
                         RequestType = "WFH",
-                        //RequestDate = DateOnly.FromDateTime(DateTime.Today),
+                        RequestDate = DateTime.Today,
                         Reason = reason ?? "Requested via AI Copilot",
-                        Status = "Pending",
-                        //CreatedAt = DateTime.UtcNow
+                        Status = "Pending"
                     };
 
                     _db.WFHRequests.Add(wfh);
