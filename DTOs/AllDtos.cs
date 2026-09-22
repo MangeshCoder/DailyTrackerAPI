@@ -1942,4 +1942,18 @@ namespace DailyTrackerAPI.DTOs
         public string Result { get; set; } = string.Empty;
         public DateTime AttemptedAt { get; set; }
     }
+
+    // ─── Location Tracking (Away-From-Office) ──────────────────────────────────
+    public class GrantConsentDto
+    {
+        [Required, MaxLength(20)]
+        public string PolicyVersion { get; set; } = string.Empty;
+    }
+
+    public class ConsentStatusDto
+    {
+        public bool HasActiveConsent { get; set; }
+        public DateTime? ConsentedAt { get; set; }
+        public string? PolicyVersion { get; set; }
+    }
 }

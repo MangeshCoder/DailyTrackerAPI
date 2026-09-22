@@ -80,6 +80,11 @@ namespace DailyTrackerAPI.Data
         public DbSet<ExitChecklistItem> ExitChecklistItems { get; set; }
         public DbSet<SupportAssignment> SupportAssignments { get; set; }
 
+        // ─── Away-From-Office Tracking ─────────────────────────────────────────
+        public DbSet<LocationConsent> LocationConsents { get; set; }
+        public DbSet<GeofenceEvent> GeofenceEvents { get; set; }
+        public DbSet<AwayLog> AwayLogs { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder mb)
         {
@@ -603,6 +608,28 @@ namespace DailyTrackerAPI.Data
 
                 // Index for fast "get all attempts for user" queries
                 e.HasIndex(f => new { f.UserId, f.AttemptedAt });
+            });
+
+            // ── LocationConsent
+            mb.Entity<LocationConsent>(e =>
+                e.HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId)
+                 .OnDelete(DeleteBehavior.Cascade));
+
+            // ── GeofenceEvent
+            mb.Entity<GeofenceEvent>(e =>
+            {
+                e.HasIndex(g => g.ClientEventId).IsUnique();
+                e.HasOne(g => g.User).WithMany().HasForeignKey(g => g.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── AwayLog
+            mb.Entity<AwayLog>(e =>
+            {
+                e.HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(a => a.DailyLog).WithMany().HasForeignKey(a => a.DailyLogId)
+                 .OnDelete(DeleteBehavior.SetNull);
             });
         }
     }
