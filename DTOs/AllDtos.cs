@@ -1956,4 +1956,29 @@ namespace DailyTrackerAPI.DTOs
         public DateTime? ConsentedAt { get; set; }
         public string? PolicyVersion { get; set; }
     }
+    // ─── Geofence Events ────────────────────────────────────────────────────────
+    public class GeofenceEventDto
+    {
+        [Required, MaxLength(64)]
+        public string ClientEventId { get; set; } = string.Empty;
+
+        [Required, MaxLength(10)]
+        public string EventType { get; set; } = string.Empty; // "Enter" | "Exit"
+
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public DateTime OccurredAt { get; set; }
+    }
+
+    public class GeofenceEventBatchDto
+    {
+        public List<GeofenceEventDto> Events { get; set; } = new();
+    }
+
+    public class GeofenceEventBatchResultDto
+    {
+        public int Processed { get; set; }
+        public int Skipped { get; set; }
+        public int Rejected { get; set; }
+    }
 }
