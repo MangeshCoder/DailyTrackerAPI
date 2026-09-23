@@ -430,20 +430,21 @@ namespace DailyTrackerAPI.Services.Attendance
                 int daysPresent = userLogs.Count(l => l.DayStatus == "Present");
                 int daysWFH = userLogs.Count(l => l.DayStatus == "WFH")
                     + userWFH.Count(r => r.RequestType == "WFH"
-                        && !userLogs.Any(l => l.LogDate.Date == r.RequestDate.Date)); // avoid double-count
+                        && !userLogs.Any(l => l.LogDate.Date == r.RequestDate.Date));
                 int daysHalfDay = userLogs.Count(l => l.DayStatus == "HalfDay")
                     + userWFH.Count(r => r.RequestType == "HalfDay"
                         && !userLogs.Any(l => l.LogDate.Date == r.RequestDate.Date));
+                int daysWeekend = userLogs.Count(l => l.DayStatus == "Weekend"); // ← NEW
+                int daysHoliday = userLogs.Count(l => l.DayStatus == "Holiday"); // ← NEW
+
                 int daysWorked = daysPresent + daysWFH + daysHalfDay;
+                // Weekend/Holiday are bonus days — don't reduce the absent count
                 int daysAbsent = Math.Max(0, workingDays - daysWorked);
 
                 var totalWorkMinutes = userLogs.Sum(l =>
-                {
-                    if (l.CheckInTime.HasValue && l.CheckOutTime.HasValue)
-                        return (int)(l.CheckOutTime.Value - l.CheckInTime.Value).TotalMinutes;
-
-                    return 0;
-                });
+                    l.CheckInTime.HasValue && l.CheckOutTime.HasValue
+                        ? (int)(l.CheckOutTime.Value - l.CheckInTime.Value).TotalMinutes
+                        : 0);
 
                 return new TeamAttendanceMonthDto
                 {
@@ -457,17 +458,24 @@ namespace DailyTrackerAPI.Services.Attendance
                     DaysWFH = daysWFH,
                     DaysHalfDay = daysHalfDay,
                     DaysAbsent = daysAbsent,
+                    DaysWeekend = daysWeekend,  // ← NEW
+                    DaysHoliday = daysHoliday,  // ← NEW
                     AttendancePercentage = workingDays > 0
                         ? Math.Round(daysWorked / (double)workingDays * 100, 1) : 0,
                     TotalWorkMinutes = totalWorkMinutes,
                     TotalWorkHours = FormatHours(totalWorkMinutes),
                     AverageDailyHours = daysWorked > 0
                         ? Math.Round(totalWorkMinutes / 60.0 / daysWorked, 1) : 0,
-                    TotalTasksCompleted = userLogs.Sum(l => l.TaskLogs?.Count(t => t.Status == "Completed") ?? 0),
+                    TotalTasksCompleted = userLogs.Sum(l =>
+                        l.TaskLogs?.Count(t => t.Status == "Completed") ?? 0),
                     WFHDates = userWFH.Where(r => r.RequestType == "WFH")
                         .Select(r => r.RequestDate.ToString("yyyy-MM-dd")).ToList(),
                     HalfDayDates = userWFH.Where(r => r.RequestType == "HalfDay")
-                        .Select(r => r.RequestDate.ToString("yyyy-MM-dd")).ToList()
+                        .Select(r => r.RequestDate.ToString("yyyy-MM-dd")).ToList(),
+                    WeekendDates = userLogs.Where(l => l.DayStatus == "Weekend") // ← NEW
+                        .Select(l => l.LogDate.ToString("yyyy-MM-dd")).ToList(),
+                    HolidayDates = userLogs.Where(l => l.DayStatus == "Holiday") // ← NEW
+                        .Select(l => l.LogDate.ToString("yyyy-MM-dd")).ToList(),
                 };
             }).OrderBy(m => m.FullName).ToList();
         }

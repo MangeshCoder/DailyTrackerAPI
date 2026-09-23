@@ -5,7 +5,8 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<RootNamespace>DailyTrackerAPI</RootNamespace>
-	</PropertyGroup>
+	  <UserSecretsId>c02bc512-40bf-40c1-9caf-a2b8518fe876</UserSecretsId>
+  </PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />

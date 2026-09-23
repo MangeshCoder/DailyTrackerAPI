@@ -1,10 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DailyTrackerAPI.DTOs
 {
-    // ─── Auth ───────────────────────────────────────────────────────────────────
-
+    // Auth DTOs are used for registration, login, and token responses. They include validation attributes to ensure required fields are provided and properly formatted.
     public class RegisterDto
     {
         [Required] public string FullName { get; set; } = string.Empty;
@@ -39,7 +37,7 @@ namespace DailyTrackerAPI.DTOs
 
     }
 
-    /// <summary>Full profile — returned by GET /api/profile and GET /api/directory/{id}</summary>
+    // Includes all fields plus manager info (denormalized for convenience)
     public class UserProfileDto
     {
         public int Id { get; set; }
@@ -54,12 +52,11 @@ namespace DailyTrackerAPI.DTOs
         public DateTime? JoinDate { get; set; }
         public string? ProfilePhotoUrl { get; set; }
         public DateTime CreatedAt { get; set; }
-        // Manager info (denormalized for convenience)
         public int? ManagerId { get; set; }
         public string? ManagerName { get; set; }
     }
 
-    /// <summary>Fields the employee themselves can edit via PUT /api/profile</summary>
+    // Manager-only fields (Role, Department, Designation, ManagerId, IsActive) are NOT included here to prevent unauthorized changes.
     public class UpdateProfileDto
     {
         public string? FullName { get; set; }   // allow name correction
@@ -566,21 +563,21 @@ namespace DailyTrackerAPI.DTOs
 
     public class CreateSupportDto
     {
+        [Required] public int SupportEngineerId { get; set; }  // ← NEW (Feature 2)
         [Required] public int SupportedDeveloperId { get; set; }
         [Required] public string IssueDescription { get; set; } = string.Empty;
         public string? Resolution { get; set; }
         public int TimeSpentMinutes { get; set; } = 0;
         public string SupportType { get; set; } = "Technical";
-
-        // GPS coordinates sent from the browser
-        // Required — backend WILL reject if missing (location check is mandatory)
         [Required] public double Latitude { get; set; }
         [Required] public double Longitude { get; set; }
+        public int? SupportAssignmentId { get; set; }  // ← NEW (Feature 3, optional)
     }
 
     public class SupportLogResponseDto
     {
         public int Id { get; set; }
+        public string SupportEngineerName { get; set; } = string.Empty;  // ← NEW
         public string SupportedDeveloperName { get; set; } = string.Empty;
         public string IssueDescription { get; set; } = string.Empty;
         public string? Resolution { get; set; }
@@ -588,11 +585,39 @@ namespace DailyTrackerAPI.DTOs
         public string SupportType { get; set; } = string.Empty;
         public DateTime SupportedAt { get; set; }
         public List<MediaEvidenceDto> Media { get; set; } = new();
-
-        // Location info — shown to managers in audit view
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
         public double? DistanceFromOfficeMetres { get; set; }
+        public bool WasAssigned { get; set; }  // ← true if created under manager assignment
+    }
+    public class SupportAssignmentDto
+    {
+        public int Id { get; set; }
+        public int SupportEngineerId { get; set; }
+        public string SupportEngineerName { get; set; } = string.Empty;
+        public int DeveloperId { get; set; }
+        public string DeveloperName { get; set; } = string.Empty;
+        public string AssignedByManager { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public string? Notes { get; set; }
+        public DateTime AssignedAt { get; set; }
+    }
+
+    public class CreateSupportAssignmentDto
+    {
+        [Required] public int SupportEngineerId { get; set; }
+        [Required] public int DeveloperId { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    public class MyAssignmentDto
+    {
+        public bool HasAssignment { get; set; }
+        public int? AssignmentId { get; set; }
+        public int? SupportEngineerId { get; set; }
+        public string? SupportEngineerName { get; set; }
+        public string? Notes { get; set; }
+        public DateTime? AssignedAt { get; set; }
     }
 
     public class MediaEvidenceDto
@@ -650,6 +675,8 @@ namespace DailyTrackerAPI.DTOs
         public int DaysWFH { get; set; }
         public int DaysHalfDay { get; set; }
         public int DaysAbsent { get; set; }
+        public int DaysWeekend { get; set; }  
+        public int DaysHoliday { get; set; }  
         public double AttendancePercentage { get; set; }
         public int TotalWorkMinutes { get; set; }
         public string TotalWorkHours { get; set; } = string.Empty;
@@ -836,6 +863,10 @@ namespace DailyTrackerAPI.DTOs
         public int DaysWFH { get; set; }
         public int DaysHalfDay { get; set; }
         public int DaysAbsent { get; set; }
+        public int DaysWeekend { get; set; }  
+        public int DaysHoliday { get; set; }
+        public List<string> WeekendDates { get; set; } = new();
+        public List<string> HolidayDates { get; set; } = new();
         public double AttendancePercentage { get; set; }
         public int TotalWorkMinutes { get; set; }
         public string TotalWorkHours { get; set; } = "";
@@ -1475,6 +1506,8 @@ namespace DailyTrackerAPI.DTOs
 
         // Net
         public decimal NetPay { get; set; }
+        public int DaysWeekend { get; set; }  // came in on Saturday/Sunday
+        public int DaysHoliday { get; set; }  // came in on a public holiday
 
         // Line item breakdown (for payslip display)
         public List<PayslipEarningDto> Earnings { get; set; } = new();
@@ -1849,5 +1882,103 @@ namespace DailyTrackerAPI.DTOs
         public int CompletedCount { get; set; }
         public int RejectedCount { get; set; }
         public List<ResignationDto> Active { get; set; } = new(); // Pending + Accepted
+    }
+
+    public class WeekendHolidayAttendanceDto
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public DateTime Date { get; set; }
+        public string DayStatus { get; set; } = string.Empty;  // "Weekend" | "Holiday"
+        public string DayOfWeek { get; set; } = string.Empty;  // "Saturday" | "Sunday" | "Monday"...
+        public string? HolidayName { get; set; }                  // name of the holiday if applicable
+        public DateTime? CheckInTime { get; set; }
+        public DateTime? CheckOutTime { get; set; }
+        public int WorkMinutes { get; set; }
+        public string WorkHours { get; set; } = string.Empty;
+    }
+
+    // ── Face Registration ─────────────────────────────────────────────────────
+
+    /// <summary>Employee or manager submits 128-float descriptor from face-api.js</summary>
+    public class RegisterFaceDto
+    {
+        /// <summary>JSON array of 128 floats e.g. "[0.12, -0.45, ...]"</summary>
+        public string Descriptor { get; set; } = string.Empty;
+
+        /// <summary>Optional: manager registering on behalf of an employee</summary>
+        public int? TargetUserId { get; set; }
+    }
+
+    /// <summary>Log a face attempt result from the frontend after comparison</summary>
+    public class FaceAttemptDto
+    {
+        public string Action { get; set; } = "CheckIn"; // "CheckIn" | "CheckOut"
+        public bool Success { get; set; }
+        public float Distance { get; set; }
+        public string Result { get; set; } = string.Empty;
+        // "NoFaceDetected" | "Mismatch" | "NotRegistered" | "Matched"
+    }
+
+    /// <summary>Returned to the client when they request a descriptor for verification</summary>
+    public class FaceDescriptorResponseDto
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public bool FaceRegistered { get; set; }
+        public string? Descriptor { get; set; } // null if not yet registered
+    }
+
+    /// <summary>One failed/passed face attempt shown to manager</summary>
+    public class FaceAttemptLogDto
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Action { get; set; } = string.Empty;
+        public bool Success { get; set; }
+        public float Distance { get; set; }
+        public string Result { get; set; } = string.Empty;
+        public DateTime AttemptedAt { get; set; }
+    }
+
+    // ─── Location Tracking (Away-From-Office) ──────────────────────────────────
+    public class GrantConsentDto
+    {
+        [Required, MaxLength(20)]
+        public string PolicyVersion { get; set; } = string.Empty;
+    }
+
+    public class ConsentStatusDto
+    {
+        public bool HasActiveConsent { get; set; }
+        public DateTime? ConsentedAt { get; set; }
+        public string? PolicyVersion { get; set; }
+    }
+    // ─── Geofence Events ────────────────────────────────────────────────────────
+    public class GeofenceEventDto
+    {
+        [Required, MaxLength(64)]
+        public string ClientEventId { get; set; } = string.Empty;
+
+        [Required, MaxLength(10)]
+        public string EventType { get; set; } = string.Empty; // "Enter" | "Exit"
+
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public DateTime OccurredAt { get; set; }
+    }
+
+    public class GeofenceEventBatchDto
+    {
+        public List<GeofenceEventDto> Events { get; set; } = new();
+    }
+
+    public class GeofenceEventBatchResultDto
+    {
+        public int Processed { get; set; }
+        public int Skipped { get; set; }
+        public int Rejected { get; set; }
     }
 }

@@ -73,6 +73,10 @@ namespace DailyTrackerAPI.Controllers.Auth
             {
                 var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
                 var result = await _authSvc.LoginAsync(dto.Email, dto.Password, ip, deviceToken);
+                if (!result.RequiresTwoFactor)
+                {
+                    SetAuthCookies(result.Tokens);
+                }
                 return Ok(result);
             }
             catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }
@@ -90,6 +94,7 @@ namespace DailyTrackerAPI.Controllers.Auth
             {
                 var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
                 var result = await _authSvc.Verify2FAAndLoginAsync(dto.TempToken, dto.Code, ip);
+                SetAuthCookies(result);
                 return Ok(result);
             }
             catch (UnauthorizedAccessException ex) { return Unauthorized(new { message = ex.Message }); }

@@ -1,6 +1,7 @@
 using DailyTrackerAPI.Models.Attendance;
 using DailyTrackerAPI.Models.Auth;
 using DailyTrackerAPI.Models.Communication;
+using DailyTrackerAPI.Models.Face_Lock;
 using DailyTrackerAPI.Models.HR;
 using DailyTrackerAPI.Models.Performance;
 using DailyTrackerAPI.Models.Tasks;
@@ -52,6 +53,7 @@ namespace DailyTrackerAPI.Data
         public DbSet<TrustedDevice> TrustedDevices { get; set; }
         public DbSet<PendingLogin> PendingLogins { get; set; }
         public DbSet<WFHRequest> WFHRequests { get; set; }
+        public DbSet<FaceAttemptLog> FaceAttemptLogs { get; set; }
         public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
 
         // ─── Chat System ──────────────────────────────────────────────────────────
@@ -76,6 +78,12 @@ namespace DailyTrackerAPI.Data
         public DbSet<Certification> Certifications { get; set; }
         public DbSet<Resignation> Resignations { get; set; }
         public DbSet<ExitChecklistItem> ExitChecklistItems { get; set; }
+        public DbSet<SupportAssignment> SupportAssignments { get; set; }
+
+        // ─── Away-From-Office Tracking ─────────────────────────────────────────
+        public DbSet<LocationConsent> LocationConsents { get; set; }
+        public DbSet<GeofenceEvent> GeofenceEvents { get; set; }
+        public DbSet<AwayLog> AwayLogs { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder mb)
@@ -118,15 +126,48 @@ namespace DailyTrackerAPI.Data
                  .OnDelete(DeleteBehavior.Cascade));
 
             // ── SupportLog
-            mb.Entity<SupportLog>(e => {
+            mb.Entity<SupportLog>(e =>
+            {
                 e.HasOne(s => s.DailyLog)
                  .WithMany(d => d.SupportLogs)
                  .HasForeignKey(s => s.DailyLogId)
                  .OnDelete(DeleteBehavior.Cascade);
 
+                // Who received support
                 e.HasOne(s => s.SupportedDeveloper)
                  .WithMany(u => u.SupportGiven)
                  .HasForeignKey(s => s.SupportedDeveloperId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                // Who gave support (Feature 2)
+                e.HasOne(s => s.SupportEngineer)
+                 .WithMany(u => u.SupportLogsAsEngineer)
+                 .HasForeignKey(s => s.SupportEngineerId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                // Optional assignment link (Feature 3)
+                e.HasOne(s => s.SupportAssignment)
+                 .WithMany(a => a.SupportLogs)
+                 .HasForeignKey(s => s.SupportAssignmentId)
+                 .OnDelete(DeleteBehavior.SetNull)
+                 .IsRequired(false);
+            });
+
+            mb.Entity<SupportAssignment>(e =>
+            {
+                e.HasOne(a => a.SupportEngineer)
+                 .WithMany()
+                 .HasForeignKey(a => a.SupportEngineerId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(a => a.Developer)
+                 .WithMany()
+                 .HasForeignKey(a => a.DeveloperId)
+                 .OnDelete(DeleteBehavior.Restrict);
+
+                e.HasOne(a => a.AssignedByManager)
+                 .WithMany()
+                 .HasForeignKey(a => a.AssignedByManagerId)
                  .OnDelete(DeleteBehavior.Restrict);
             });
 
@@ -556,6 +597,39 @@ namespace DailyTrackerAPI.Data
                  .HasForeignKey(c => c.CompletedByUserId)
                  .IsRequired(false)
                  .OnDelete(DeleteBehavior.NoAction);
+            });
+
+            mb.Entity<FaceAttemptLog>(e =>
+            {
+                e.HasOne(f => f.User)
+                 .WithMany()
+                 .HasForeignKey(f => f.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                // Index for fast "get all attempts for user" queries
+                e.HasIndex(f => new { f.UserId, f.AttemptedAt });
+            });
+
+            // ── LocationConsent
+            mb.Entity<LocationConsent>(e =>
+                e.HasOne(c => c.User).WithMany().HasForeignKey(c => c.UserId)
+                 .OnDelete(DeleteBehavior.Cascade));
+
+            // ── GeofenceEvent
+            mb.Entity<GeofenceEvent>(e =>
+            {
+                e.HasIndex(g => g.ClientEventId).IsUnique();
+                e.HasOne(g => g.User).WithMany().HasForeignKey(g => g.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ── AwayLog
+            mb.Entity<AwayLog>(e =>
+            {
+                e.HasOne(a => a.User).WithMany().HasForeignKey(a => a.UserId)
+                 .OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(a => a.DailyLog).WithMany().HasForeignKey(a => a.DailyLogId)
+                 .OnDelete(DeleteBehavior.SetNull);
             });
         }
     }

@@ -4,6 +4,7 @@ using DailyTrackerAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DailyTrackerAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913173243_AddFaceRecognition")]
+    partial class AddFaceRecognition
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,38 +24,6 @@ namespace DailyTrackerAPI.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.AwayLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("DailyLogId")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("DurationMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("EndedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DailyLogId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("AwayLogs");
-                });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.BreakLog", b =>
                 {
@@ -128,49 +99,6 @@ namespace DailyTrackerAPI.Migrations
                     b.ToTable("DailyGoals");
                 });
 
-            modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.GeofenceEvent", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ClientEventId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
-                    b.Property<double>("Latitude")
-                        .HasColumnType("float");
-
-                    b.Property<double>("Longitude")
-                        .HasColumnType("float");
-
-                    b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ReceivedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClientEventId")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("GeofenceEvents");
-                });
-
             modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.LateArrivalReason", b =>
                 {
                     b.Property<int>("Id")
@@ -202,38 +130,6 @@ namespace DailyTrackerAPI.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("LateArrivalReasons");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.LocationConsent", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("ConsentedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("PolicyVersion")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<bool>("Revoked")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("LocationConsents");
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.UserPresence", b =>
@@ -2158,24 +2054,6 @@ namespace DailyTrackerAPI.Migrations
                     b.ToTable("TaskTimers");
                 });
 
-            modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.AwayLog", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.Tasks.DailyLog", "DailyLog")
-                        .WithMany()
-                        .HasForeignKey("DailyLogId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("DailyTrackerAPI.Models.Auth.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("DailyLog");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.BreakLog", b =>
                 {
                     b.HasOne("DailyTrackerAPI.Models.Tasks.DailyLog", "DailyLog")
@@ -2188,17 +2066,6 @@ namespace DailyTrackerAPI.Migrations
                 });
 
             modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.DailyGoal", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.Auth.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.GeofenceEvent", b =>
                 {
                     b.HasOne("DailyTrackerAPI.Models.Auth.User", "User")
                         .WithMany()
@@ -2224,17 +2091,6 @@ namespace DailyTrackerAPI.Migrations
                         .IsRequired();
 
                     b.Navigation("DailyLog");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("DailyTrackerAPI.Models.Attendance.LocationConsent", b =>
-                {
-                    b.HasOne("DailyTrackerAPI.Models.Auth.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("User");
                 });

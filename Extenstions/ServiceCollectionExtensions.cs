@@ -53,6 +53,7 @@ namespace DailyTrackerAPI.Extensions
             services.AddScoped<ISupportService, SupportService>();
             services.AddScoped<IGoalService, GoalService>();
             services.AddScoped<IEODService, EODService>();
+            services.AddScoped<ISupportAssignmentService, SupportAssignmentService>();
 
             // ── HR & Leave ────────────────────────────────────────────────────
             services.AddScoped<ILeaveService, LeaveService>();
